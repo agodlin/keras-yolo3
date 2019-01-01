@@ -4,8 +4,8 @@ import shutil
 from tqdm import tqdm
 import cv2
 
-r = '/mnt/face_data/person_data'
-
+s = '/mnt/person_data'
+d = '/mnt/face_data/resize_05'
 lines = open('train.txt').readlines()
 lines_updated = []
 for l in tqdm(lines):
@@ -13,16 +13,29 @@ for l in tqdm(lines):
     if 'person_data' not in l:
         continue
     file_path = data[0]
-    dst_file = file_path.replace('person_data', 'person_data_05')
-    rect,class_id = data[1].split(',')[:4],data[1].split(',')[-1]
+    dst_file = file_path.replace(s,d)
+    rect_str,class_id = data[1].split(',')[:4],data[1].split(',')[-1]
     
+    scale_size = 0.5
+    img = cv2.imread(file_path)
+    resized = cv2.resize(img, (0,0), fx=scale_size, fy=scale_size, interpolation = cv2.INTER_AREA)
+
+    res = list(map(lambda x: str(int(x*scale_size)), map(int, rect_str)))
+    res.append(class_id)
+    rect_str = ','.join(res)
+    
+    lines_updated.append('%s, %s'%(dst_file, rect_str))
+
     if os.path.exists(dst_file):
         continue
-    
+
     dst_f = os.path.dirname(dst_file)
     pathlib.Path(dst_f).mkdir(parents=True, exist_ok=True)
-    shutil.copyfile(file_path,dst_file)
-    
+    cv2.imwrite(dst_file, resized)
+
+
+with open('train_02.txt', 'w') as f:
+    f.writelines(map(lambda s: s + '\n', train_list))
 
 
 
