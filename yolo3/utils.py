@@ -5,6 +5,8 @@ from functools import reduce
 from PIL import Image
 import numpy as np
 from matplotlib.colors import rgb_to_hsv, hsv_to_rgb
+import cv2
+import random
 
 def compose(*funcs):
     """Compose arbitrarily many functions, evaluated left to right.
@@ -19,29 +21,48 @@ def compose(*funcs):
 
 def letterbox_image(image, size):
     '''resize image with unchanged aspect ratio using padding'''
-    iw, ih = image.size
+    ih, iw = image.shape[:2]
     w, h = size
     scale = min(w/iw, h/ih)
     nw = int(iw*scale)
     nh = int(ih*scale)
+    dx, dy = ((w-nw)//2, (h-nh)//2)
+    image = cv2.resize(image, (nw, nh), interpolation=cv2.INTER_CUBIC)
+    new_image = Image.fromarray(np.zeros((w, h), dtype=np.float32))
+    new_image.paste(Image.fromarray(image), (dx, dy))
+    image = np.asarray(new_image)
+    image_data = image / 65535.
+    image_data[image_data > 1] = 1
+    image_data[image_data < 0] = 0
+    image_data = np.expand_dims(image_data, axis=2)
 
-    image = image.resize((nw,nh), Image.BICUBIC)
-    new_image = Image.new('RGB', size, (128,128,128))
-    new_image.paste(image, ((w-nw)//2, (h-nh)//2))
-    return new_image
+    return image_data
 
 def rand(a=0, b=1):
     return np.random.rand()*(b-a) + a
 
-def get_random_data(annotation_line, input_shape, random=True, max_boxes=20, jitter=.3, hue=.1, sat=1.5, val=1.5, proc_img=True):
-    '''random preprocessing for real-time data augmentation'''
+def gamma_correction(image, correction=1.0, is_normalized=True, scale=255):
+    if not is_normalized:
+        image /= scale
+    # image **= correction
+    image = np.sign(image) * np.abs(image) ** correction
+    if not is_normalized:
+        image *= scale
+    return image
+                                            
+
+def get_random_data(annotation_line, input_shape, randomize=True, max_boxes=20, jitter=.3, hue=.1, sat=1.5, val=1.5, proc_img=True):
+    '''randomize preprocessing for real-time data augmentation'''
     line = annotation_line.split()
-    image = Image.open(line[0])
-    iw, ih = image.size
+    image = cv2.imread(line[0], cv2.IMREAD_UNCHANGED)
+    image = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
+    image = image.astype(np.float32)
+    ih, iw = image.shape[:2]
+
     h, w = input_shape
     box = np.array([np.array(list(map(int,box.split(',')))) for box in line[1:]])
 
-    if not random:
+    if not randomize:
         # resize image
         scale = min(w/iw, h/ih)
         nw = int(iw*scale)
@@ -75,33 +96,45 @@ def get_random_data(annotation_line, input_shape, random=True, max_boxes=20, jit
     else:
         nw = int(scale*w)
         nh = int(nw/new_ar)
-    image = image.resize((nw,nh), Image.BICUBIC)
+
+    image = cv2.resize(image, (nw, nh), interpolation=cv2.INTER_CUBIC)
 
     # place image
     dx = int(rand(0, w-nw))
     dy = int(rand(0, h-nh))
-    new_image = Image.new('RGB', (w,h), (128,128,128))
-    new_image.paste(image, (dx, dy))
-    image = new_image
+    
+    
+    new_image = Image.fromarray(np.zeros((w, h), dtype=np.float32))
+    new_image.paste(Image.fromarray(image), (dx, dy))
+    image = np.asarray(new_image)
 
     # flip image or not
     flip = rand()<.5
-    if flip: image = image.transpose(Image.FLIP_LEFT_RIGHT)
+    if flip:
+        image = cv2.flip(image, flipCode=1)
+
+    if False:
+        # distort image
+        hue = rand(-hue, hue)
+        sat = rand(1, sat) if rand()<.5 else 1/rand(1, sat)
+        val = rand(1, val) if rand()<.5 else 1/rand(1, val)
+        x = rgb_to_hsv(nn/p.array(image)/255.)
+        x[..., 0] += hue
+        x[..., 0][x[..., 0]>1] -= 1
+        x[..., 0][x[..., 0]<0] += 1
+        x[..., 1] *= sat
+        x[..., 2] *= val
+        x[x>1] = 1
+        x[x<0] = 0
+        image_data = hsv_to_rgb(x) # numpy array, 0 to 1
 
     # distort image
-    hue = rand(-hue, hue)
-    sat = rand(1, sat) if rand()<.5 else 1/rand(1, sat)
-    val = rand(1, val) if rand()<.5 else 1/rand(1, val)
-    x = rgb_to_hsv(np.array(image)/255.)
-    x[..., 0] += hue
-    x[..., 0][x[..., 0]>1] -= 1
-    x[..., 0][x[..., 0]<0] += 1
-    x[..., 1] *= sat
-    x[..., 2] *= val
-    x[x>1] = 1
-    x[x<0] = 0
-    image_data = hsv_to_rgb(x) # numpy array, 0 to 1
-
+    image = gamma_correction(np.array(image), random.uniform(0.75, 1.25), is_normalized=False, scale=65535)
+    image_data = image / 65535.
+    image_data[image_data > 1] = 1
+    image_data[image_data < 0] = 0
+    image_data = np.expand_dims(image_data, axis=2)
+        
     # correct boxes
     box_data = np.zeros((max_boxes,5))
     if len(box)>0:

@@ -4,7 +4,8 @@ from yolo import YOLO, detect_video
 from PIL import Image
 from tqdm import tqdm
 import numpy as np
-
+import numpy
+import cv2
 def detect_img(yolo):
     while True:
         img = input('Input image filename:')
@@ -29,10 +30,15 @@ def test_iou(yolo, annotation_path):
     for annotation_line in tqdm(val_images):
         file_path, rect, _ = parse_line(annotation_line)
         try:
-            image = Image.open(file_path)
-        except:
-            print('Open Error! continue to next')
-            continue
+            #image = Image.open(file_path)
+            image = cv2.imread(file_path, cv2.IMREAD_UNCHANGED)
+            image = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
+            image = image.astype(np.float32)
+            
+        except Exception as e:
+            print('Open Error! continue to next ' + file_path)
+            print(e)
+            return
         out_boxes, out_scores, out_classes = yolo.detect_image2(image)
         if len(out_boxes) >= 1:
             score = out_scores[0]
@@ -44,8 +50,8 @@ def test_iou(yolo, annotation_path):
             top, left, bottom, right = out_boxes[0]
             top = max(0, np.floor(top + 0.5).astype('int32'))
             left = max(0, np.floor(left + 0.5).astype('int32'))
-            bottom = min(image.size[1], np.floor(bottom + 0.5).astype('int32'))
-            right = min(image.size[0], np.floor(right + 0.5).astype('int32'))
+            bottom = min(image.shape[0], np.floor(bottom + 0.5).astype('int32'))
+            right = min(image.shape[1], np.floor(right + 0.5).astype('int32'))
 
             box = [left, top, right, bottom]
 #            print(file_path, rect, box)

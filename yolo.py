@@ -67,14 +67,22 @@ class YOLO(object):
         num_anchors = len(self.anchors)
         num_classes = len(self.class_names)
         is_tiny_version = num_anchors==6 # default setting
-        try:
-            self.yolo_model = load_model(model_path, compile=False)
-        except:
-            self.yolo_model = tiny_yolo_body(Input(shape=(None,None,3)), num_anchors//2, num_classes) \
+        input_shape = (416, 416, 1)
+        print(num_anchors, num_classes, input_shape)
+        self.yolo_model = yolo_body(Input(shape=input_shape), num_anchors//3, num_classes)
+        self.yolo_model.load_weights(self.model_path)        
+        if False:
+            try:
+                print('here')
+                self.yolo_model = load_model(model_path, compile=False)
+            
+            except:
+                self.yolo_model = tiny_yolo_body(Input(shape=(None,None,3)), num_anchors//2, num_classes) \
                 if is_tiny_version else yolo_body(Input(shape=(None,None,3)), num_anchors//3, num_classes)
-            self.yolo_model.load_weights(self.model_path) # make sure model, anchors and classes match
-        else:
-            assert self.yolo_model.layers[-1].output_shape[-1] == \
+                self.yolo_model.load_weights(self.model_path) # make sure model, anchors and classes match
+            else:
+                print('here 2')
+                assert self.yolo_model.layers[-1].output_shape[-1] == \
                 num_anchors/len(self.yolo_model.output) * (num_classes + 5), \
                 'Mismatch between model and given anchor and class sizes'
 
@@ -180,16 +188,17 @@ class YOLO(object):
             new_image_size = (image.width - (image.width % 32),
                               image.height - (image.height % 32))
             boxed_image = letterbox_image(image, new_image_size)
-        image_data = np.array(boxed_image, dtype='float32')
+        #image_data = np.array(boxed_image, dtype='float32')
 
-        image_data /= 255.
+        #image_data /= 255.
+        image_data = np.array(boxed_image, dtype='float32')
         image_data = np.expand_dims(image_data, 0)  # Add batch dimension.
 
         out_boxes, out_scores, out_classes = self.sess.run(
             [self.boxes, self.scores, self.classes],
             feed_dict={
                 self.yolo_model.input: image_data,
-                self.input_image_shape: [image.size[1], image.size[0]],
+                self.input_image_shape: [image.shape[0], image.shape[1]],
                 K.learning_phase(): 0
             })
 
