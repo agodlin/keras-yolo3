@@ -27,6 +27,7 @@ def test_iou(yolo, annotation_path):
     err = 0
     err_score = 0
     err_iou = 0
+    not_supported = 0
     for annotation_line in tqdm(val_images):
         file_path, rect, _ = parse_line(annotation_line)
         try:
@@ -34,18 +35,19 @@ def test_iou(yolo, annotation_path):
             image = cv2.imread(file_path, cv2.IMREAD_UNCHANGED)
             image = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
             image = image.astype(np.float32)
-            
         except Exception as e:
             print('Open Error! continue to next ' + file_path)
             print(e)
             return
         out_boxes, out_scores, out_classes = yolo.detect_image2(image)
-        if len(out_boxes) >= 1:
+        if out_boxes is None:
+            not_supported += 1
+            continue        
+        if len(out_boxes) == 1 and rect is not None:
             score = out_scores[0]
             if score < 0.5:
                 err_score+=1
-                continue
-            
+                continue            
 
             top, left, bottom, right = out_boxes[0]
             top = max(0, np.floor(top + 0.5).astype('int32'))
@@ -60,10 +62,12 @@ def test_iou(yolo, annotation_path):
                 err_iou += 1
             else:
                 tpr+=1
- 
+        elif len(out_boxes) > 1 and rect is not None:
+            not_supported += 1            
         else:
-            err+=1 
-    total = len(val_images)
+            err+=1
+    total = len(val_images)-not_supported
+    print('not supported', not_supported)
     print('total tpr, err', tpr/total*100, err/total*100)
     print('score err, iou err', err_score/total*100, err_iou/total*100)
             
@@ -92,7 +96,13 @@ def bb_intersection_over_union(boxA, boxB):
 
 def parse_line(image_line):
     data = image_line.strip().split()
+    if len(data) > 2:
+        return None,None,None
     file_path = data[0]
+    
+    if len(data) == 1:
+        return file_path, None, None
+
     rect_str,class_id = data[1].split(',')[:4],data[1].split(',')[-1]
     
     rect = list(map(int, rect_str))
@@ -126,7 +136,7 @@ if __name__ == '__main__':
     )
 
     parser.add_argument(
-        '--anchors', type=str,
+        '--anchors_path', type=str,
         help='path to anchor definitions, default ' + YOLO.get_defaults("anchors_path")
     )
 

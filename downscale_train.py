@@ -3,11 +3,13 @@ import pathlib
 import shutil
 from tqdm import tqdm
 import cv2
+import random
 
 s = '/mnt/person_data'
 d = '/mnt/face_data/resize_02'
 lines = open('train_full.txt').readlines()
 lines_updated = []
+random.shuffle(lines)
 for l in tqdm(lines):
     data = l.strip().split()
     if 'person_data' not in l:

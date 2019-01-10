@@ -17,7 +17,7 @@ def _main():
     annotation_path = 'train_02.txt'
     log_dir = 'logs/000/'
     classes_path = 'model_data/voc_classes.txt'
-    anchors_path = 'model_data/yolo_anchors.txt'
+    anchors_path = 'model_data/tiny_yolo_anchors.txt'
     class_names = get_classes(classes_path)
     num_classes = len(class_names)
     anchors = get_anchors(anchors_path)
@@ -75,15 +75,7 @@ def _main():
         model.compile(optimizer=Adam(lr=1e-3), loss={'yolo_loss': lambda y_true, y_pred: y_pred}) # recompile to apply the change
         print('Unfreeze all of the layers.')
 
-<<<<<<< HEAD
-<<<<<<< HEAD
         batch_size = 8 # note that more GPU memory is required after unfreezing the body
-=======
-        batch_size = 16 # note that more GPU memory is required after unfreezing the body
->>>>>>> b6f943d... Train full network
-=======
-        batch_size = 8 # note that more GPU memory is required after unfreezing the body
->>>>>>> 2f6fd34... update batch size
         print('Train on {} samples, val on {} samples, with batch size {}.'.format(num_train, num_val, batch_size))
         model.fit_generator(data_generator_wrapper(lines[:num_train], batch_size, input_shape, anchors, num_classes),
             steps_per_epoch=max(1, num_train//batch_size),
@@ -155,7 +147,7 @@ def create_tiny_model(input_shape, anchors, num_classes, load_pretrained=True, f
 
     model_body = tiny_yolo_body(image_input, num_anchors//2, num_classes)
     print('Create Tiny YOLOv3 model with {} anchors and {} classes.'.format(num_anchors, num_classes))
-
+    load_pretrained = False
     if load_pretrained:
         model_body.load_weights(weights_path, by_name=True, skip_mismatch=True)
         print('Load weights {}.'.format(weights_path))
