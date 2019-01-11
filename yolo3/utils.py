@@ -28,6 +28,7 @@ def letterbox_image(image, size):
     nh = int(ih*scale)
     dx, dy = ((w-nw)//2, (h-nh)//2)
     image = cv2.resize(image, (nw, nh), interpolation=cv2.INTER_CUBIC)
+    image = image.astype(np.float32)
     new_image = Image.fromarray(np.zeros((w, h), dtype=np.float32))
     new_image.paste(Image.fromarray(image), (dx, dy))
     image = np.asarray(new_image)
@@ -56,7 +57,6 @@ def get_random_data(annotation_line, input_shape, randomize=True, max_boxes=20, 
     line = annotation_line.split()
     image = cv2.imread(line[0], cv2.IMREAD_UNCHANGED)
     image = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
-    image = image.astype(np.float32)
     ih, iw = image.shape[:2]
 
     h, w = input_shape
@@ -98,7 +98,7 @@ def get_random_data(annotation_line, input_shape, randomize=True, max_boxes=20, 
         nh = int(nw/new_ar)
 
     image = cv2.resize(image, (nw, nh), interpolation=cv2.INTER_CUBIC)
-
+    image = image.astype(np.float32)
     # place image
     dx = int(rand(0, w-nw))
     dy = int(rand(0, h-nh))
