@@ -21,7 +21,7 @@ from keras.utils import multi_gpu_model
 class YOLO(object):
     _defaults = {
         "model_path": 'model_data/yolo.h5',
-        "anchors_path": 'model_data/yolo_anchors.txt',
+        "anchors_path": 'model_data/tiny_yolo_anchors.txt',
         "classes_path": 'model_data/voc_classes.txt',
         "score" : 0.3,
         "iou" : 0.45,
@@ -67,9 +67,9 @@ class YOLO(object):
         num_anchors = len(self.anchors)
         num_classes = len(self.class_names)
         is_tiny_version = num_anchors==6 # default setting
-        input_shape = (416, 416, 1)
+        input_shape = (self.model_image_size[0], self.model_image_size[1], 1)
         print(num_anchors, num_classes, input_shape)
-        self.yolo_model = yolo_body(Input(shape=input_shape), num_anchors//3, num_classes)
+        self.yolo_model = tiny_yolo_body(Input(shape=input_shape), num_anchors//2, num_classes)
         self.yolo_model.load_weights(self.model_path)        
         if False:
             try:

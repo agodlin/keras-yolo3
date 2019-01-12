@@ -24,7 +24,7 @@ def _main():
 
     input_shape = (224,224) # multiple of 32, hw
 
-    is_tiny_version = len(anchors)==6 # default setting
+    is_tiny_version = True #len(anchors)==6 # default setting
     if is_tiny_version:
         print('Run Tiny Yolo')
         model = create_tiny_model(input_shape, anchors, num_classes,
@@ -48,7 +48,8 @@ def _main():
     np.random.seed(None)
     num_val = int(len(lines)*val_split)
     num_train = len(lines) - num_val
-    print('info', input_shape, num_classes)
+    num_anchors = len(anchors)
+    print('info', input_shape, num_classes, num_anchors)
     # Train with frozen layers first, to get a stable loss.
     # Adjust num epochs to your dataset. This step is enough to obtain a not bad model.
     if False:
@@ -138,8 +139,8 @@ def create_tiny_model(input_shape, anchors, num_classes, load_pretrained=True, f
             weights_path='model_data/tiny_yolo_weights.h5'):
     '''create the training model, for Tiny YOLOv3'''
     K.clear_session() # get a new session
-    image_input = Input(shape=(None, None, 1))
     h, w = input_shape
+    image_input = Input(shape=(h, w, 1))    
     num_anchors = len(anchors)
 
     y_true = [Input(shape=(h//{0:32, 1:16}[l], w//{0:32, 1:16}[l], \

@@ -41,7 +41,7 @@ def test_iou(yolo, annotation_path):
             return
         out_boxes, out_scores, out_classes = yolo.detect_image2(image)
         if out_boxes is None:
-            not_supported += 1
+            err += 1
             continue        
         if len(out_boxes) == 1 and rect is not None:
             score = out_scores[0]
@@ -62,8 +62,6 @@ def test_iou(yolo, annotation_path):
                 err_iou += 1
             else:
                 tpr+=1
-        elif len(out_boxes) > 1 and rect is not None:
-            not_supported += 1            
         else:
             err+=1
     total = len(val_images)-not_supported
