@@ -32,7 +32,7 @@ def letterbox_image(image, size):
     new_image = Image.fromarray(np.zeros((w, h), dtype=np.float32))
     new_image.paste(Image.fromarray(image), (dx, dy))
     image = np.asarray(new_image)
-    image_data = image / 65535.
+    image_data = image / 256.
     image_data[image_data > 1] = 1
     image_data[image_data < 0] = 0
     image_data = np.expand_dims(image_data, axis=2)
@@ -130,7 +130,7 @@ def get_random_data(annotation_line, input_shape, randomize=True, max_boxes=20, 
 
     # distort image
     image = gamma_correction(np.array(image), random.uniform(0.75, 1.25), is_normalized=False, scale=65535)
-    image_data = image / 65535.
+    image_data = image / 256.
     image_data[image_data > 1] = 1
     image_data[image_data < 0] = 0
     image_data = np.expand_dims(image_data, axis=2)
