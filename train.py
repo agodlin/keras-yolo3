@@ -160,7 +160,8 @@ def create_tiny_model(input_shape, anchors, num_classes, load_pretrained=True, f
             num = (20, len(model_body.layers)-2)[freeze_body-1]
             for i in range(num): model_body.layers[i].trainable = False
             print('Freeze the first {} layers of total {} layers.'.format(num, len(model_body.layers)))
-
+    print(model_body.output)
+    print(*y_true)
     model_loss = Lambda(yolo_loss, output_shape=(1,), name='yolo_loss',
         arguments={'anchors': anchors, 'num_classes': num_classes, 'ignore_thresh': 0.7})(
         [model_body.output, *y_true])

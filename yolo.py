@@ -67,10 +67,11 @@ class YOLO(object):
         num_anchors = len(self.anchors)
         num_classes = len(self.class_names)
         is_tiny_version = num_anchors==6 # default setting
+
         input_shape = (self.model_image_size[0], self.model_image_size[1], 1)
         print(num_anchors, num_classes, input_shape)
         self.yolo_model = tiny_yolo_body(Input(shape=input_shape), num_anchors//1, num_classes)
-        self.yolo_model.load_weights(self.model_path)        
+        self.yolo_model.load_weights(self.model_path)
         if False:
             try:
                 print('here')
@@ -110,6 +111,7 @@ class YOLO(object):
         return boxes, scores, classes
 
     def detect_image(self, image):
+        import cv2
         start = timer()
 
         if self.model_image_size != (None, None):
@@ -121,11 +123,12 @@ class YOLO(object):
                               image.height - (image.height % 32))
             boxed_image = letterbox_image(image, new_image_size)
         image_data = np.array(boxed_image, dtype='float32')
-
-        print(image_data.shape)
-        image_data /= 255.
+        #
+        # print(image_data.shape)
+        # image_data /= 255.
         image_data = np.expand_dims(image_data, 0)  # Add batch dimension.
-
+        image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
+        image = Image.fromarray(image)
         out_boxes, out_scores, out_classes = self.sess.run(
             [self.boxes, self.scores, self.classes],
             feed_dict={
@@ -134,7 +137,7 @@ class YOLO(object):
                 K.learning_phase(): 0
             })
 
-        print('Found {} boxes for {}'.format(len(out_boxes), 'img'))
+        # print('Found {} boxes for {}'.format(len(out_boxes), 'img'))
 
         font = ImageFont.truetype(font='font/FiraMono-Medium.otf',
                     size=np.floor(3e-2 * image.size[1] + 0.5).astype('int32'))
@@ -144,7 +147,8 @@ class YOLO(object):
             predicted_class = self.class_names[c]
             box = out_boxes[i]
             score = out_scores[i]
-
+            if score < 0.9:
+                continue
             label = '{} {:.2f}'.format(predicted_class, score)
             draw = ImageDraw.Draw(image)
             label_size = draw.textsize(label, font)
@@ -154,7 +158,7 @@ class YOLO(object):
             left = max(0, np.floor(left + 0.5).astype('int32'))
             bottom = min(image.size[1], np.floor(bottom + 0.5).astype('int32'))
             right = min(image.size[0], np.floor(right + 0.5).astype('int32'))
-            print(label, (left, top), (right, bottom))
+            # print(label, (left, top), (right, bottom))
 
             if top - label_size[1] >= 0:
                 text_origin = np.array([left, top - label_size[1]])
@@ -163,17 +167,15 @@ class YOLO(object):
 
             # My kingdom for a good redistributable image drawing library.
             for i in range(thickness):
-                draw.rectangle(
-                    [left + i, top + i, right - i, bottom - i],
-                    outline=self.colors[c])
+                draw.rectangle([left + i, top + i, right - i, bottom - i], outline=(0, 255, 0))
             draw.rectangle(
                 [tuple(text_origin), tuple(text_origin + label_size)],
-                fill=self.colors[c])
-            draw.text(text_origin, label, fill=(0, 0, 0), font=font)
+                fill=(0, 255, 0))
+            draw.text(text_origin, label, fill=0, font=font)
             del draw
 
         end = timer()
-        print(end - start)
+        # print(end - start)
         return image
 
     def close_session(self):
@@ -208,7 +210,8 @@ class YOLO(object):
         
 def detect_video(yolo, video_path, output_path=""):
     import cv2
-    vid = cv2.VideoCapture(video_path)
+    vid = cv2.VideoCapture(0)
+    # vid = cv2.VideoCapture(video_path)
     if not vid.isOpened():
         raise IOError("Couldn't open webcam or video")
     video_FourCC    = int(vid.get(cv2.CAP_PROP_FOURCC))
@@ -225,7 +228,8 @@ def detect_video(yolo, video_path, output_path=""):
     prev_time = timer()
     while True:
         return_value, frame = vid.read()
-        image = Image.fromarray(frame)
+        if len(frame.shape) > 2:
+            image = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         image = yolo.detect_image(image)
         result = np.asarray(image)
         curr_time = timer()
@@ -247,7 +251,57 @@ def detect_video(yolo, video_path, output_path=""):
             break
     yolo.close_session()
 
+import MtcnnDNet.FaceDetectorMTCNN as FaceDetectorMTCNN
 
+def detect_video2(yolo, video_path, output_path=""):
+    import pyrealsense2 as rs
+    import cv2
+    mtcnn_model_path = 'C:\\work/face-algo/Landmarks/MtcnnDNet/align'
+    if os.path.exists(mtcnn_model_path):
+        face_detector = FaceDetectorMTCNN.FaceDetectorMTCNN(mtcnn_model_path, min_face_size=60)
+    try:
+        accum_time = 0
+        curr_fps = 0
+        fps = "FPS: ??"
+        prev_time = timer()
+        # Create a context object. This object owns the handles to all connected realsense devices
+        cfg = rs.config()
+        cfg.enable_stream(rs.stream.infrared, 1, 640, 480, rs.format.y8,
+                          60)
+        pipeline = rs.pipeline()
+        pipeline.start(cfg)
+        while True:
+            # Create a pipeline object. This object configures the streaming camera and owns it's handle
+            frames = pipeline.wait_for_frames()
+            image = frames.get_infrared_frame()
+            if not image:
+                continue
+            image = np.asanyarray(image.get_data())
+            if len(image.shape) > 2:
+                image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+            # bounding_boxes, landmarks = face_detector.apply_mtcnn(image)
+            bounding_boxes = np.array([])
+            image = yolo.detect_image(image)
+            draw = ImageDraw.Draw(image)
+            bounding_boxes = bounding_boxes.astype(np.int)
+            if len(bounding_boxes) > 0:
+                draw.rectangle([bounding_boxes[0][0], bounding_boxes[0][1], bounding_boxes[0][2], bounding_boxes[0][3]], outline=255)
+            result = np.asarray(image)
+            curr_time = timer()
+            exec_time = curr_time - prev_time
+            prev_time = curr_time
+            accum_time = accum_time + exec_time
+            curr_fps = curr_fps + 1
+            if accum_time > 1:
+                accum_time = accum_time - 1
+                fps = "FPS: " + str(curr_fps)
+                curr_fps = 0
+            cv2.putText(result, text=fps, org=(3, 15), fontFace=cv2.FONT_HERSHEY_SIMPLEX,
+                        fontScale=0.50, color=(255, 0, 0), thickness=2)
+            cv2.namedWindow("result", cv2.WINDOW_NORMAL)
+            cv2.imshow("result", result)
 
-
-
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                break
+    finally:
+        pass

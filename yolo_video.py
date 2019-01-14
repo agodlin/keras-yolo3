@@ -1,11 +1,12 @@
 import sys
 import argparse
-from yolo import YOLO, detect_video
+from yolo import YOLO, detect_video, detect_video2
 from PIL import Image
 from tqdm import tqdm
 import numpy as np
 import numpy
 import cv2
+
 def detect_img(yolo):
     while True:
         img = input('Input image filename:')
@@ -31,14 +32,16 @@ def test_iou(yolo, annotation_path):
     for annotation_line in tqdm(val_images):
         file_path, rect, _ = parse_line(annotation_line)
         try:
-            #image = Image.open(file_path)
-            image = cv2.imread(file_path, cv2.IMREAD_UNCHANGED)
-            image = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
+            color = cv2.imread(file_path, cv2.IMREAD_UNCHANGED)
+            if len(color.shape) > 2:
+                image = cv2.cvtColor(color, cv2.COLOR_RGB2GRAY)
+            else:
+                image = color
             image = image.astype(np.float32)
         except Exception as e:
             print('Open Error! continue to next ' + file_path)
             print(e)
-            return
+            continue
         out_boxes, out_scores, out_classes = yolo.detect_image2(image)
         if out_boxes is None:
             err += 1
@@ -55,9 +58,17 @@ def test_iou(yolo, annotation_path):
             bottom = min(image.shape[0], np.floor(bottom + 0.5).astype('int32'))
             right = min(image.shape[1], np.floor(right + 0.5).astype('int32'))
 
-            box = [left, top, right, bottom]
+            box = np.array([left, top, right, bottom])
 #            print(file_path, rect, box)
             iou = bb_intersection_over_union(rect, box)
+            if False:
+                color = (color/256).astype(np.uint8)
+                cv2.rectangle(color, tuple(rect[:2].astype(np.int)), tuple(rect[2:4].astype(np.int)),
+                              (0, 255, 0), 3)
+                cv2.rectangle(color, tuple(box[:2].astype(np.int)), tuple(box[2:4].astype(np.int)),
+                              (0, 0, 255), 3)
+                cv2.imshow('', color)
+                cv2.waitKey()
             if iou < 0.5:
                 err_iou += 1
             else:
@@ -65,6 +76,74 @@ def test_iou(yolo, annotation_path):
         else:
             err+=1
     total = len(val_images)-not_supported
+    print('not supported', not_supported)
+    print('total tpr, err', tpr/total*100, err/total*100)
+    print('score err, iou err', err_score/total*100, err_iou/total*100)
+
+def test_iou2(yolo, annotation_path):
+    val_images = get_annotation_list(annotation_path)
+    tpr = 0
+    err = 0
+    err_score = 0
+    err_iou = 0
+    not_supported = 0
+    total = 0
+    for annotation_line in tqdm(val_images):
+        file_path, rects, _ = parse_line(annotation_line)
+        try:
+            color = cv2.imread(file_path, cv2.IMREAD_UNCHANGED)
+            if len(color.shape) > 2:
+                image = cv2.cvtColor(color, cv2.COLOR_BGR2GRAY)
+            else:
+                image = color
+            image = image.astype(np.float32)
+        except Exception as e:
+            print('Open Error! continue to next ' + file_path)
+            print(e)
+            continue
+        boxes, scores, out_classes = yolo.detect_image2(image)
+
+        if rects is None and (boxes is None or len(boxes) == 0):
+            tpr+=1
+            total += 1
+            continue
+        elif rects is not None and (boxes is None or len(boxes) == 0):
+            err += len(rects)
+            total += len(rects)
+            continue
+        elif rects is None:
+            not_supported+=1
+            total += 1
+            continue
+
+        for i in range(len(boxes)):
+            score = scores[i]
+            if score < 0.5:
+                err_score += 1
+                total += 1
+                continue
+            top, left, bottom, right = boxes[i]
+            top = max(0, np.floor(top + 0.5).astype('int32'))
+            left = max(0, np.floor(left + 0.5).astype('int32'))
+            bottom = min(image.shape[0], np.floor(bottom + 0.5).astype('int32'))
+            right = min(image.shape[1], np.floor(right + 0.5).astype('int32'))
+
+            found = -1
+            box = np.array([left, top, right, bottom])
+            for j in range(len(rects)):
+                rect = rects[j]
+                iou = bb_intersection_over_union(rect, box)
+
+                if iou > 0.5:
+                    found = j
+
+            if found > -1:
+                tpr += 1
+                total += 1
+            else:
+                err_iou += 1
+                total += 1
+
     print('not supported', not_supported)
     print('total tpr, err', tpr/total*100, err/total*100)
     print('score err, iou err', err_score/total*100, err_iou/total*100)
@@ -94,21 +173,22 @@ def bb_intersection_over_union(boxA, boxB):
 
 def parse_line(image_line):
     data = image_line.strip().split()
-    if len(data) > 2:
-        return None,None,None
     file_path = data[0]
-    
     if len(data) == 1:
         return file_path, None, None
 
-    rect_str,class_id = data[1].split(',')[:4],data[1].split(',')[-1]
+    rects = []
+    for i in range(1, len(data)):
+
+        rect_str,class_id = data[1].split(',')[:4],data[1].split(',')[-1]
+        rect = list(map(int, rect_str))
+        rects.append(rect)
     
-    rect = list(map(int, rect_str))
-    return file_path, rect, class_id
+    return file_path, np.array(rects), class_id
 
 
 def get_annotation_list(annotation_path):
-    val_split = 0.1
+    val_split = 1
     with open(annotation_path) as f:
         lines = f.readlines()
     np.random.seed(10101)
@@ -171,7 +251,7 @@ if __name__ == '__main__':
     FLAGS = parser.parse_args()
 
     if FLAGS.test_iou:
-        test_iou(YOLO(**vars(FLAGS)), FLAGS.test_iou)        
+        test_iou2(YOLO(**vars(FLAGS)), FLAGS.test_iou)
     
     elif FLAGS.image:
         """
@@ -182,6 +262,6 @@ if __name__ == '__main__':
             print(" Ignoring remaining command line arguments: " + FLAGS.input + "," + FLAGS.output)
         detect_img(YOLO(**vars(FLAGS)))
     elif "input" in FLAGS:
-        detect_video(YOLO(**vars(FLAGS)), FLAGS.input, FLAGS.output)
+        detect_video2(YOLO(**vars(FLAGS)), FLAGS.input, FLAGS.output)
     else:
         print("Must specify at least video_input_path.  See usage with --help.")
