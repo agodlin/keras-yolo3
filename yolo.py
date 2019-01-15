@@ -25,7 +25,7 @@ class YOLO(object):
         "classes_path": 'model_data/voc_classes.txt',
         "score" : 0.3,
         "iou" : 0.45,
-        "model_image_size" : (224, 224),
+        "model_image_size" : (96, 96),
         "gpu_num" : 1,
     }
 
@@ -69,7 +69,7 @@ class YOLO(object):
         is_tiny_version = num_anchors==6 # default setting
         input_shape = (self.model_image_size[0], self.model_image_size[1], 1)
         print(num_anchors, num_classes, input_shape)
-        self.yolo_model = tiny_yolo_body(Input(shape=input_shape), num_anchors//2, num_classes)
+        self.yolo_model = tiny_yolo_body(Input(shape=input_shape), num_anchors//1, num_classes)
         self.yolo_model.load_weights(self.model_path)        
         if False:
             try:
@@ -106,6 +106,7 @@ class YOLO(object):
         boxes, scores, classes = yolo_eval(self.yolo_model.output, self.anchors,
                 len(self.class_names), self.input_image_shape,
                 score_threshold=self.score, iou_threshold=self.iou)
+        print(boxes, scores, classes)
         return boxes, scores, classes
 
     def detect_image(self, image):

@@ -119,7 +119,7 @@ def get_annotation_list(annotation_path):
 
     val_images = lines[num_train:]
     print('Testing on', len(val_images), 'images')
-    return val_images
+    return val_images[:10]
 
 
 if __name__ == '__main__':
