@@ -10,10 +10,13 @@ from keras.layers.advanced_activations import LeakyReLU
 from keras.layers.normalization import BatchNormalization
 from keras.models import Model
 from keras.regularizers import l2
-
+from keras import backend
+from keras import layers
+from keras import models
+from keras import utils
+import keras_applications.mobilenet_v2 as mobilenet_v2
+import keras_applications
 from yolo3.utils import compose
-
-
 @wraps(Conv2D)
 def DarknetConv2D(*args, **kwargs):
     """Wrapper to set Darknet parameters for Convolution2D."""
@@ -52,6 +55,17 @@ def darknet_body(x):
     x = resblock_body(x, 512, 8)
     x = resblock_body(x, 1024, 4)
     return x
+
+
+def mobilenet_v2_body(inputs, num_anchors, num_classes):
+    keras_applications.set_keras_submodules(backend, layers, models, utils)
+    model = mobilenet_v2.MobileNetV2(input_shape=(96,96,1), input_tensor=inputs, weights=None, include_top=False)
+
+    x = compose(DarknetConv2D_BN_Leaky(128, (1,1)),UpSampling2D(2))(model.input)
+    y = compose(DarknetConv2D_BN_Leaky(256, (3,3)),DarknetConv2D(num_anchors*(num_classes+5), (1,1)))(x)
+
+    return Model(inputs, [y])
+
 
 def make_last_layers(x, num_filters, out_filters):
     '''6 Conv2D_BN_Leaky layers followed by a Conv2D_linear layer'''
@@ -104,7 +118,7 @@ def tiny_yolo_body(inputs, num_anchors, num_classes):
             MaxPooling2D(pool_size=(2,2), strides=(1,1), padding='same'),
             DarknetConv2D_BN_Leaky(1024, (3,3)),
             DarknetConv2D_BN_Leaky(256, (1,1)))(x1)
-    y1 = compose(DarknetConv2D_BN_Leaky(512, (3,3)),DarknetConv2D(num_anchors*(num_classes+5), (1,1)))(x2)
+    # y1 = compose(DarknetConv2D_BN_Leaky(512, (3,3)),DarknetConv2D(num_anchors*(num_classes+5), (1,1)))(x2)
 
     x2 = compose(DarknetConv2D_BN_Leaky(128, (1,1)),UpSampling2D(2))(x2)
     y2 = compose(Concatenate(),DarknetConv2D_BN_Leaky(256, (3,3)),DarknetConv2D(num_anchors*(num_classes+5), (1,1)))([x2,x1])
@@ -193,6 +207,7 @@ def yolo_eval(yolo_outputs,
               score_threshold=.6,
               iou_threshold=.5):
     """Evaluate YOLO model on given input and return filtered boxes."""
+    print('preprocess_true_boxes start')
     yolo_outputs = [yolo_outputs]
     num_layers = len(yolo_outputs)
     anchor_mask = [[6,7,8], [3,4,5], [0,1,2]] if num_layers==3 else [[0]] # default setting
@@ -247,6 +262,7 @@ def preprocess_true_boxes(true_boxes, input_shape, anchors, num_classes):
     y_true: list of array, shape like yolo_outputs, xywh are reletive value
 
     '''
+    print('preprocess_true_boxes start')
     assert (true_boxes[..., 4]<num_classes).all(), 'class id must be less than num_classes'
     num_layers = len(anchors)//1 # default setting
     anchor_mask = [[6,7,8], [3,4,5], [0,1,2]] if num_layers==3 else [[0]]
@@ -299,7 +315,7 @@ def preprocess_true_boxes(true_boxes, input_shape, anchors, num_classes):
                     y_true[l][b, j, i, k, 4] = 1
                     y_true[l][b, j, i, k, 5+c] = 1
 
-
+    print('done')
     return y_true
 
 
