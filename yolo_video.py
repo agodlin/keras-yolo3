@@ -188,7 +188,7 @@ def parse_line(image_line):
 
 
 def get_annotation_list(annotation_path):
-    val_split = 1
+    val_split = 0.1
     with open(annotation_path) as f:
         lines = f.readlines()
     np.random.seed(10101)
@@ -199,7 +199,7 @@ def get_annotation_list(annotation_path):
 
     val_images = lines[num_train:]
     print('Testing on', len(val_images), 'images')
-    return val_images[:10]
+    return val_images
 
 
 if __name__ == '__main__':

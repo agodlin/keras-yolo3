@@ -13,7 +13,7 @@ from keras.models import load_model
 from keras.layers import Input
 from PIL import Image, ImageFont, ImageDraw
 
-from yolo3.model import yolo_eval, yolo_body, tiny_yolo_body
+from yolo3.model import yolo_eval, yolo_body, tiny_yolo_body, mobilenet_v2_body
 from yolo3.utils import letterbox_image
 import os
 from keras.utils import multi_gpu_model
@@ -70,7 +70,8 @@ class YOLO(object):
 
         input_shape = (self.model_image_size[0], self.model_image_size[1], 1)
         print(num_anchors, num_classes, input_shape)
-        self.yolo_model = tiny_yolo_body(Input(shape=input_shape), num_anchors//1, num_classes)
+#        self.yolo_model = tiny_yolo_body(Input(shape=input_shape), num_anchors//1, num_classes)
+        self.yolo_model = mobilenet_v2_body(Input(shape=input_shape), num_anchors//1, num_classes)
         self.yolo_model.load_weights(self.model_path)
         if False:
             try:
@@ -251,7 +252,7 @@ def detect_video(yolo, video_path, output_path=""):
             break
     yolo.close_session()
 
-import MtcnnDNet.FaceDetectorMTCNN as FaceDetectorMTCNN
+#import MtcnnDNet.FaceDetectorMTCNN as FaceDetectorMTCNN
 
 def detect_video2(yolo, video_path, output_path=""):
     import pyrealsense2 as rs
