@@ -60,9 +60,8 @@ def darknet_body(x):
 
 def mobilenet_v2_body(inputs, num_anchors, num_classes):
     keras_applications.set_keras_submodules(backend, layers, models, utils)
-    model = mobilenet_v2.MobileNetV2(input_shape=(96,96,1), input_tensor=inputs, weights=None, include_top=False)
-
-    x = compose(DarknetConv2D_BN_Leaky(128, (1,1)),UpSampling2D(2))(model.output)
+    model = mobilenet_v2.MobileNetV2(input_shape=(96,96,1), alpha=0.75, input_tensor=inputs, weights=None, include_top=False)
+    x = compose(DarknetConv2D_BN_Leaky(128, (1,1)))(model.layers[119].output)
     y = compose(DarknetConv2D_BN_Leaky(256, (3,3)),DarknetConv2D(num_anchors*(num_classes+5), (1,1)))(x)
 
     return Model(inputs, [y])
