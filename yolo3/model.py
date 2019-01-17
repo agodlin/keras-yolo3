@@ -14,7 +14,7 @@ from keras import backend
 from keras import layers
 from keras import models
 from keras import utils
-import keras_applications.mobilenet_v2 as mobilenet_v2
+import yolo3.mobilenet_v2_mv as mobilenet_v2
 import keras_applications
 from yolo3.utils import compose
 
@@ -425,5 +425,4 @@ def yolo_loss(args, anchors, num_classes, ignore_thresh=.5, print_loss=False):
         loss += xy_loss + wh_loss + confidence_loss + class_loss
         if print_loss:
             loss = tf.Print(loss, [loss, xy_loss, wh_loss, confidence_loss, class_loss, K.sum(ignore_mask)], message='loss: ')
-
     return loss
