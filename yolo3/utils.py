@@ -56,7 +56,8 @@ def get_random_data(annotation_line, input_shape, randomize=True, max_boxes=20, 
     '''randomize preprocessing for real-time data augmentation'''
     line = annotation_line.split()
     image = cv2.imread(line[0], cv2.IMREAD_UNCHANGED)
-    image = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
+    if image.ndim == 3:
+        image = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
     ih, iw = image.shape[:2]
 
     h, w = input_shape

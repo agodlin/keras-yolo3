@@ -5,14 +5,15 @@ from tqdm import tqdm
 import cv2
 import random
 
-s = '/mnt/person_data'
-d = '/mnt/face_data/resize_02'
-lines = open('train_full.txt').readlines()
+s = 'person_data'
+d = 'resize_02'
+lines = open('train_wider.txt').readlines()
 lines_updated = []
 random.shuffle(lines)
 for l in tqdm(lines):
     data = l.strip().split()
     if 'person_data' not in l:
+        lines_updated.append(l.strip())
         continue
     file_path = data[0]
     dst_file = file_path.replace(s,d)
@@ -37,7 +38,7 @@ for l in tqdm(lines):
     cv2.imwrite(dst_file, resized)
 
 
-with open('train_full_02.txt', 'w') as f:
+with open('train_wider_02.txt', 'w') as f:
     f.writelines(map(lambda s: s + '\n', lines_updated))
 
 

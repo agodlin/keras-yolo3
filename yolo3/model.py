@@ -59,8 +59,9 @@ def darknet_body(x):
 
 
 def mobilenet_v2_body(inputs, num_anchors, num_classes):
+    input_shape = inputs.shape
     keras_applications.set_keras_submodules(backend, layers, models, utils)
-    model = mobilenet_v2.MobileNetV2(input_shape=(96,96,1), alpha=0.75, input_tensor=inputs, weights=None, include_top=False)
+    model = mobilenet_v2.MobileNetV2(input_shape=(input_shape[1],input_shape[2],1), alpha=1, input_tensor=inputs, weights=None, include_top=False)
     x = compose(DarknetConv2D_BN_Leaky(128, (1,1)))(model.layers[118].output)
     y = compose(DarknetConv2D_BN_Leaky(256, (3,3)),DarknetConv2D(num_anchors*(num_classes+5), (1,1)))(x)
     return Model(inputs, [y])
@@ -208,7 +209,7 @@ def yolo_eval(yolo_outputs,
     """Evaluate YOLO model on given input and return filtered boxes."""
     yolo_outputs = [yolo_outputs]
     num_layers = len(yolo_outputs)
-    anchor_mask = [[6,7,8], [3,4,5], [0,1,2]] if num_layers==3 else [[0]] # default setting
+    anchor_mask = [[6,7,8], [3,4,5], [0,1,2]] if num_layers==3 else [[0,1,2]] # default setting
     input_shape = K.shape(yolo_outputs[0])[1:3] * 32
     boxes = []
     box_scores = []
@@ -262,8 +263,8 @@ def preprocess_true_boxes(true_boxes, input_shape, anchors, num_classes):
     '''
 
     assert (true_boxes[..., 4]<num_classes).all(), 'class id must be less than num_classes'
-    num_layers = len(anchors)//1 # default setting
-    anchor_mask = [[6,7,8], [3,4,5], [0,1,2]] if num_layers==3 else [[0]]
+    num_layers = len(anchors)//3 # default setting
+    anchor_mask = [[6,7,8], [3,4,5], [0,1,2]] if num_layers==3 else [[0,1,2]]
     true_boxes = np.array(true_boxes, dtype='float32')
     input_shape = np.array(input_shape, dtype='int32')
     boxes_xy = (true_boxes[..., 0:2] + true_boxes[..., 2:4]) // 2
@@ -375,10 +376,10 @@ def yolo_loss(args, anchors, num_classes, ignore_thresh=.5, print_loss=False):
 
     '''
     anchors = np.array(anchors)
-    num_layers = len(anchors)//1 # default setting
+    num_layers = len(anchors)//3 # default setting
     yolo_outputs = args[:num_layers]
     y_true = args[num_layers:]
-    anchor_mask = [[6,7,8], [3,4,5], [0,1,2]] if num_layers==3 else [[0]]
+    anchor_mask = [[6,7,8], [3,4,5], [0,1,2]] if num_layers==3 else [[0,1,2]]
     input_shape = K.cast(K.shape(yolo_outputs[0])[1:3] * 32, K.dtype(y_true[0]))
     grid_shapes = [K.cast(K.shape(yolo_outputs[l])[1:3], K.dtype(y_true[0])) for l in range(num_layers)]
     loss = 0

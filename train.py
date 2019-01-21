@@ -14,7 +14,7 @@ from yolo3.utils import get_random_data
 
 
 def _main():
-    annotation_path = 'train_02.txt'
+    annotation_path = 'train_wider_02.txt'
     log_dir = 'logs/000/'
     classes_path = 'model_data/voc_classes.txt'
     anchors_path = 'model_data/tiny_yolo_anchors.txt'
@@ -22,7 +22,7 @@ def _main():
     num_classes = len(class_names)
     anchors = get_anchors(anchors_path)
 
-    input_shape = (96,96) # multiple of 32, hw
+    input_shape = (192,192) # multiple of 32, hw
 
     is_tiny_version = True #len(anchors)==6 # default setting
     if is_tiny_version:
