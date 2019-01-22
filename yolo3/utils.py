@@ -21,6 +21,8 @@ def compose(*funcs):
 
 def letterbox_image(image, size):
     '''resize image with unchanged aspect ratio using padding'''
+    if image.ndim == 3:
+        image = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
     ih, iw = image.shape[:2]
     w, h = size
     scale = min(w/iw, h/ih)

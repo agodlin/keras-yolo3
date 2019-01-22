@@ -9,15 +9,17 @@ import cv2
 
 def detect_img(yolo):
     while True:
-        img = input('Input image filename:')
+
+        # img = input('Input image filename:')
+        img = r'C:\temp\face_image.jpg'
         try:
-            image = Image.open(img)
+            image = cv2.imread(img)
         except:
             print('Open Error! Try again!')
             continue
         else:
-            r_image = yolo.detect_image(image)
-            r_image.show()
+            r_image = yolo.detect_image2(image)
+            # r_image.show()
     yolo.close_session()
     
 FLAGS = None
@@ -249,7 +251,8 @@ if __name__ == '__main__':
     )
     
     FLAGS = parser.parse_args()
-
+    FLAGS.image = True
+    FLAGS.model_path = 'logs/000/trained_weights_final.h5'
     if FLAGS.test_iou:
         test_iou2(YOLO(**vars(FLAGS)), FLAGS.test_iou)
     

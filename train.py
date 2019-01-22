@@ -14,7 +14,7 @@ from yolo3.utils import get_random_data
 import h5_pb
 
 def _main():
-    annotation_path = 'train_wider_02.txt'
+    annotation_path = 'train_02.txt'
     log_dir = 'logs/000/'
     classes_path = 'model_data/voc_classes.txt'
     anchors_path = 'model_data/tiny_yolo_anchors.txt'
@@ -42,7 +42,7 @@ def _main():
 
     val_split = 0.1
     with open(annotation_path) as f:
-        lines = f.readlines()
+        lines = f.readlines()[:10]
     np.random.seed(10101)
     np.random.shuffle(lines)
     np.random.seed(None)
@@ -82,7 +82,7 @@ def _main():
             steps_per_epoch=max(1, num_train//batch_size),
             validation_data=data_generator_wrapper(lines[num_train:], batch_size, input_shape, anchors, num_classes),
             validation_steps=max(1, num_val//batch_size),
-            epochs=100,
+            epochs=1,
             initial_epoch=0,
             callbacks=[logging, checkpoint, reduce_lr, early_stopping])
         model.save_weights(log_dir + 'trained_weights_final.h5')
