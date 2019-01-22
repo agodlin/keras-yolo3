@@ -62,8 +62,11 @@ def mobilenet_v2_body(inputs, num_anchors, num_classes):
     input_shape = inputs.shape
     keras_applications.set_keras_submodules(backend, layers, models, utils)
     model = mobilenet_v2.MobileNetV2(input_shape=(input_shape[1],input_shape[2],1), alpha=1, input_tensor=inputs, weights=None, include_top=False)
-    x = compose(DarknetConv2D_BN_Leaky(128, (1,1)))(model.layers[118].output)
-    y = compose(DarknetConv2D_BN_Leaky(256, (3,3)),DarknetConv2D(num_anchors*(num_classes+5), (1,1)))(x)
+    x = model.layers[118].output
+    # x = compose(DarknetConv2D_BN_Leaky(512, (3, 3)))(x)  #add this make network very slow
+    x = compose(DarknetConv2D_BN_Leaky(256, (1,1)))(x)
+    x = compose(DarknetConv2D_BN_Leaky(256, (3,3)))(x)
+    y = compose(DarknetConv2D(num_anchors * (num_classes + 5), (1, 1)))(x)
     return Model(inputs, [y])
 
 
@@ -118,12 +121,12 @@ def tiny_yolo_body(inputs, num_anchors, num_classes):
             MaxPooling2D(pool_size=(2,2), strides=(1,1), padding='same'),
             DarknetConv2D_BN_Leaky(1024, (3,3)),
             DarknetConv2D_BN_Leaky(256, (1,1)))(x1)
-    # y1 = compose(DarknetConv2D_BN_Leaky(512, (3,3)),DarknetConv2D(num_anchors*(num_classes+5), (1,1)))(x2)
+    y1 = compose(DarknetConv2D_BN_Leaky(512, (3,3)),DarknetConv2D(num_anchors*(num_classes+5), (1,1)))(x2)
 
     x2 = compose(DarknetConv2D_BN_Leaky(128, (1,1)),UpSampling2D(2))(x2)
     y2 = compose(Concatenate(),DarknetConv2D_BN_Leaky(256, (3,3)),DarknetConv2D(num_anchors*(num_classes+5), (1,1)))([x2,x1])
 
-    return Model(inputs, [y2])
+    return Model(inputs, [y1, y2])
 
 
 def yolo_head(feats, anchors, num_classes, input_shape, calc_loss=False):

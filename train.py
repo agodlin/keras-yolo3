@@ -11,7 +11,7 @@ from keras.callbacks import TensorBoard, ModelCheckpoint, ReduceLROnPlateau, Ear
 
 from yolo3.model import preprocess_true_boxes, yolo_body, tiny_yolo_body, yolo_loss, yolo_eval, mobilenet_v2_body
 from yolo3.utils import get_random_data
-
+import h5_pb
 
 def _main():
     annotation_path = 'train_wider_02.txt'
@@ -88,7 +88,7 @@ def _main():
         model.save_weights(log_dir + 'trained_weights_final.h5')
         if model_test:
             model_test.save(log_dir + 'trained_final.h5')
-
+            h5_pb.convert_model_to_tf('logs/000/trained_final.h5', 'logs/000/trained_final.pb')
     # Further training if needed.
 
 
@@ -150,6 +150,10 @@ def create_tiny_model(input_shape, anchors, num_classes, load_pretrained=True, f
         num_anchors//1, num_classes+5)) for l in range(1, 2)]
 
     model_body = mobilenet_v2_body(image_input, num_anchors//1, num_classes)
+
+    for i, l in enumerate(model_body.layers):
+        print(i, l.name, l.input_shape, l.output_shape)
+
     print('Create Tiny YOLOv3 model with {} anchors and {} classes.'.format(num_anchors, num_classes))
     load_pretrained = False
     if load_pretrained:

@@ -23,7 +23,6 @@ def convert_model_to_tf(keras_model_path, output_path, custom_objects=None):
     
     # Freeze Keras model
     K.set_learning_phase(0)
-    print(os.path.exists(keras_model_path))
 
     d = {}
     custom_objects = d
@@ -47,4 +46,7 @@ def convert_model_to_tf(keras_model_path, output_path, custom_objects=None):
     print("Input layers: {}".format(inputs))
     print("Output layers: {}".format(outputs))
 
-convert_model_to_tf('logs/000/trained_final.h5', 'logs/000/trained_final.pb')
+if __name__ == '__main__':
+    convert_model_to_tf('logs/000/trained_final.h5', 'logs/000/trained_final.pb')
+
+
