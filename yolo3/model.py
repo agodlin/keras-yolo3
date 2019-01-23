@@ -64,11 +64,11 @@ def mobilenet_v2_body(inputs, num_anchors, num_classes):
     model = mobilenet_v2.MobileNetV2(input_shape=(input_shape[1],input_shape[2],1), alpha=1, input_tensor=inputs, weights=None, include_top=False)
     x = model.layers[118].output
     # x = compose(DarknetConv2D_BN_Leaky(512, (3, 3)))(x)  #add this make network very slow
-    x = DarknetConv2D_BN_Leaky(256, (1,1))(x)
+    x = DarknetConv2D_BN_Leaky(128, (1,1))(x)
     x = DarknetConv2D_BN_Leaky(256, (3,3))(x)
     y = DarknetConv2D(num_anchors * (num_classes + 5), (1, 1))(x)
-    y = Flatten()(y)
-    y = Activation(activation='sigmoid', name='output')(y)
+    # y = Flatten()(y)
+    # y = Activation(activation='sigmoid', name='output')(y)
     return Model(inputs, [y])
 
 
@@ -133,7 +133,7 @@ def tiny_yolo_body(inputs, num_anchors, num_classes):
 
 def yolo_head(feats, anchors, num_classes, input_shape, calc_loss=False):
     """Convert final layer features to bounding box parameters."""
-    feats = Reshape((12, 12, 18))(feats)
+    feats = Reshape((12, 12, 6))(feats)
     num_anchors = len(anchors)
     # Reshape to batch, height, width, num_anchors, box_params.
     anchors_tensor = K.reshape(K.constant(anchors), [1, 1, 1, num_anchors, 2])
@@ -218,7 +218,7 @@ def yolo_eval(yolo_outputs,
     num_layers = len(yolo_outputs)
     if type(yolo_outputs[0]) is not type(K.variable(1)):
         yolo_outputs[0] = K.variable(yolo_outputs[0])
-    anchor_mask = [[6,7,8], [3,4,5], [0,1,2]] if num_layers==3 else [[0,1,2]] # default setting
+    anchor_mask = [[6,7,8], [3,4,5], [0,1,2]] if num_layers==3 else [[0]] # default setting
     input_shape = K.shape(yolo_outputs[0])[1:3] * 16
     print(input_shape)
     boxes = []

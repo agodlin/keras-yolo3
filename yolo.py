@@ -213,7 +213,7 @@ class YOLO(object):
         #         K.learning_phase(): 0
         #     })
 
-        return out_boxes, out_scores, out_classes
+        return K.eval(out_boxes), K.eval(out_scores), K.eval(out_classes)
         
         
 def detect_video(yolo, video_path, output_path=""):

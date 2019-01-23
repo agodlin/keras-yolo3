@@ -6,20 +6,34 @@ from tqdm import tqdm
 import numpy as np
 import numpy
 import cv2
-
+import data_io
+import mtcnn_pp
 def detect_img(yolo):
     while True:
 
         # img = input('Input image filename:')
         img = r'C:\temp\face_image.jpg'
+        img = '\\\\ger\\ec\\proj\\ha\\RSG\\3D_ValidationVol1\\Face\\lobby\\fixed\\RSMW_2019-01-15_15-28-18_uid_79582\\AUTH_ts_153228_exp_30000.000000_res_1920x1080_lux_0.000000_score_-87.065405_SecureAuthenticationAllowed.w10'
         try:
-            image = cv2.imread(img)
+            image = data_io.read_w10(img)
+            image = mtcnn_pp.mtcnn_preprocess(image)
         except:
             print('Open Error! Try again!')
             continue
         else:
-            r_image = yolo.detect_image2(image)
-            # r_image.show()
+            out_boxes, out_scores, out_classes = yolo.detect_image2(image)
+            top, left, bottom, right = out_boxes[0]
+            top = max(0, np.floor(top + 0.5).astype('int32'))
+            left = max(0, np.floor(left + 0.5).astype('int32'))
+            bottom = min(image.shape[0], np.floor(bottom + 0.5).astype('int32'))
+            right = min(image.shape[1], np.floor(right + 0.5).astype('int32'))
+            box = np.array([left, top, right, bottom])
+            print(box)
+            color = (image).astype(np.uint8)
+            cv2.rectangle(color, tuple(box[:2].astype(np.int)), tuple(box[2:4].astype(np.int)),
+                          (0, 255, 0), 3)
+            cv2.imshow('', color)
+            cv2.waitKey()
     yolo.close_session()
     
 FLAGS = None
