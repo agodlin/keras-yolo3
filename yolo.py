@@ -25,7 +25,7 @@ class YOLO(object):
         "classes_path": 'model_data/voc_classes.txt',
         "score" : 0.3,
         "iou" : 0.45,
-        "model_image_size" : (192, 192),
+        "model_image_size" : (144, 144),
         "gpu_num" : 1,
     }
 
@@ -185,8 +185,8 @@ class YOLO(object):
 
     def detect_image2(self, image):
         if self.model_image_size != (None, None):
-            assert self.model_image_size[0]%32 == 0, 'Multiples of 32 required'
-            assert self.model_image_size[1]%32 == 0, 'Multiples of 32 required'
+            assert self.model_image_size[0]%16 == 0, 'Multiples of 32 required'
+            assert self.model_image_size[1]%16 == 0, 'Multiples of 32 required'
             boxed_image = letterbox_image(image, tuple(reversed(self.model_image_size)))
         else:
             new_image_size = (image.width - (image.width % 32),
