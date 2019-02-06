@@ -1,23 +1,37 @@
-import sys
 import argparse
 from yolo import YOLO, detect_video
-from PIL import Image
-from tqdm import tqdm
 import numpy as np
-import numpy
 import cv2
+import data_io
+import mtcnn_pp
+import os
 
-def detect_img(yolo):
-    while True:
-        img = input('Input image filename:')
-        try:
-            image = Image.open(img)
-        except:
-            print('Open Error! Try again!')
-            continue
-        else:
-            r_image = yolo.draw_image(image)
-            r_image.show()
+def detect_img(yolo, fp):
+    images = [os.path.join(fp, name) for name in os.listdir(fp) if name.endswith('w10')]
+    for img in images:
+        print(os.path.basename(img))
+        image = data_io.read_w10(img)
+        image = mtcnn_pp.mtcnn_preprocess(image, 1)
+        # image = image[:, 308:716+308]
+        yolo.detect_image(image)
+        color = image.astype(np.uint8)
+        color = cv2.cvtColor(color, cv2.COLOR_GRAY2RGB)
+
+        out_boxes, out_scores, out_classes = yolo.detect_image(image)
+        for i in range(len(out_boxes)):
+            if out_scores[i] < 0.5:
+                continue
+            top, left, bottom, right = out_boxes[i]
+            top = max(0, np.floor(top + 0.5).astype('int32'))
+            left = max(0, np.floor(left + 0.5).astype('int32'))
+            bottom = min(image.shape[0], np.floor(bottom + 0.5).astype('int32'))
+            right = min(image.shape[1], np.floor(right + 0.5).astype('int32'))
+            box = np.array([left, top, right, bottom])
+            print(box, right-left, bottom-top)
+            cv2.rectangle(color, tuple(box[:2].astype(np.int)), tuple(box[2:4].astype(np.int)),
+                          (0, 255, 0), 3)
+        cv2.imshow('', color)
+        cv2.waitKey()
     yolo.close_session()
     
 FLAGS = None
@@ -30,47 +44,30 @@ if __name__ == '__main__':
     Command line options
     '''
     parser.add_argument(
-        '--model_path', type=str,
-        help='path to model weight file, default ' + YOLO.get_defaults("model_path")
+        '--model_path', type=str, default=""
     )
 
     parser.add_argument(
-        '--anchors_path', type=str,
-        help='path to anchor definitions, default ' + YOLO.get_defaults("anchors_path")
+        '--anchors_path', type=str, default=""
     )
 
     parser.add_argument(
-        '--classes_path', type=str,
-        help='path to class definitions, default ' + YOLO.get_defaults("classes_path")
+        '--classes_path', type=str, default=""
     )
 
     parser.add_argument(
-        '--gpu_num', type=int,
-        help='Number of GPU to use, default ' + str(YOLO.get_defaults("gpu_num"))
-    )
-
-    parser.add_argument(
-        '--image', default=False, action="store_true",
-        help='Image detection mode, will ignore all positional arguments'
+        '--image', type=str, default="", help = "images folder input path"
     )
     '''
     Command line positional arguments -- for video detection mode
     '''
     parser.add_argument(
-        "--input", nargs='?', type=str,required=False,default='./path2your_video',
-        help = "Video input path"
+        "--input", type=str, default="", help = "Video input path"
     )
 
-    parser.add_argument(
-        "--output", nargs='?', type=str, default="",
-        help = "[Optional] Video output path"
-    )
-    parser.add_argument(
-        '--test_iou', default=''
-    )
-    
     FLAGS = parser.parse_args()
-
+    d = {}
+    d.update(**vars(FLAGS))
     if FLAGS.image:
         """
         Image detection mode, disregard any remaining command line arguments
@@ -78,8 +75,8 @@ if __name__ == '__main__':
         print("Image detection mode")
         if "input" in FLAGS:
             print(" Ignoring remaining command line arguments: " + FLAGS.input + "," + FLAGS.output)
-        detect_img(YOLO(**vars(FLAGS)))
+        detect_img(YOLO(**d), FLAGS.image)
     elif "input" in FLAGS:
-        detect_video(YOLO(**vars(FLAGS)), FLAGS.input, FLAGS.output)
+        detect_video(YOLO(**d), FLAGS.input)
     else:
         print("Must specify at least video_input_path.  See usage with --help.")

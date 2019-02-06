@@ -9,9 +9,9 @@ from keras.models import Model
 from keras.optimizers import Adam
 from keras.callbacks import TensorBoard, ModelCheckpoint, ReduceLROnPlateau, EarlyStopping
 
-from yolo3.model import preprocess_true_boxes, yolo_body, tiny_yolo_body, yolo_loss, yolo_eval, mobilenet_v2_body
+from yolo3.model import preprocess_true_boxes, yolo_body, yolo_loss, mobilenet_v2_body
 from yolo3.utils import get_random_data
-import h5_pb
+from utils import h5_pb
 import argparse
 
 FLAGS = None
@@ -197,16 +197,9 @@ def data_generator_wrapper(annotation_lines, batch_size, input_shape, anchors, n
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(argument_default=argparse.SUPPRESS)
-    parser.add_argument(
-        '--train_path', type=str, default='train_wider_02.txt')
-
-    parser.add_argument(
-        '--anchors_path', type=str, default='model_data/tiny_yolo_anchors.txt'
-    )
-
-    parser.add_argument(
-        '--classes_path', type=str, default='model_data/voc_classes.txt'
-    )
+    parser.add_argument('--train_path', type=str, default='train_wider_02.txt')
+    parser.add_argument('--anchors_path', type=str, default='model_data/tiny_yolo_anchors.txt')
+    parser.add_argument('--classes_path', type=str, default='model_data/voc_classes.txt')
 
     FLAGS = parser.parse_args()
     _main()

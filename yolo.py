@@ -21,12 +21,9 @@ import cv2
 
 class YOLO(object):
     _defaults = {
-        "model_path": 'model_data/yolo.h5',
-        "anchors_path": 'model_data/tiny_yolo_anchors.txt',
-        "classes_path": 'model_data/voc_classes.txt',
-        "score" : 0.3,
-        "iou" : 0.45,
-        "model_image_size" : (192, 192),
+        "score" : 0.5,
+        "iou" : 0.5,
+        "model_image_size" : (176, 176),
         "gpu_num" : 1,
         "num_outputs": 1,
     }
@@ -74,12 +71,15 @@ class YOLO(object):
         self.yolo_model = mobilenet_v2_body(Input(shape=input_shape), num_anchors//self.num_outputs, num_classes)
         self.yolo_model.load_weights(self.model_path)
 
+        self.generate_color()
+
         # Generate output tensor targets for filtered bounding boxes.
         self.input_image_shape = K.placeholder(shape=(2, ))
 
         boxes, scores, classes = yolo_eval(self.yolo_model.output, self.anchors,
                 len(self.class_names), self.input_image_shape,
                 score_threshold=self.score, iou_threshold=self.iou)
+
         return boxes, scores, classes
 
     def generate_color(self):
@@ -96,12 +96,11 @@ class YOLO(object):
 
     def draw_image(self, image):
         out_boxes, out_scores, out_classes = self.detect_image(image)
-
         # print('Found {} boxes for {}'.format(len(out_boxes), 'img'))
 
         font = ImageFont.truetype(font='font/FiraMono-Medium.otf',
-                    size=np.floor(3e-2 * image.size[1] + 0.5).astype('int32'))
-        thickness = (image.size[0] + image.size[1]) // 300
+                    size=np.floor(3e-2 * image.shape[0] + 0.5).astype('int32'))
+        thickness = (image.shape[1] + image.shape[0]) // 300
 
         for i, c in reversed(list(enumerate(out_classes))):
             predicted_class = self.class_names[c]
@@ -116,8 +115,8 @@ class YOLO(object):
             top, left, bottom, right = box
             top = max(0, np.floor(top + 0.5).astype('int32'))
             left = max(0, np.floor(left + 0.5).astype('int32'))
-            bottom = min(image.size[1], np.floor(bottom + 0.5).astype('int32'))
-            right = min(image.size[0], np.floor(right + 0.5).astype('int32'))
+            bottom = min(image.shape[0], np.floor(bottom + 0.5).astype('int32'))
+            right = min(image.shape[1], np.floor(right + 0.5).astype('int32'))
             # print(label, (left, top), (right, bottom))
 
             if top - label_size[1] >= 0:
