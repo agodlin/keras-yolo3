@@ -47,6 +47,6 @@ def convert_model_to_tf(keras_model_path, output_path, custom_objects=None):
     print("Output layers: {}".format(outputs))
 
 if __name__ == '__main__':
-    convert_model_to_tf('logs/000/trained_final.h5', 'logs/000/trained_final.pb')
+    convert_model_to_tf('logs/000/trained_final.h5', 'logs/000/v2_176.pb')
 
 
