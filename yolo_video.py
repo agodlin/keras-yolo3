@@ -2,6 +2,10 @@ import sys
 import argparse
 from yolo import YOLO, detect_video
 from PIL import Image
+from tqdm import tqdm
+import numpy as np
+import numpy
+import cv2
 
 def detect_img(yolo):
     while True:
@@ -12,11 +16,12 @@ def detect_img(yolo):
             print('Open Error! Try again!')
             continue
         else:
-            r_image = yolo.detect_image(image)
+            r_image = yolo.draw_image(image)
             r_image.show()
     yolo.close_session()
-
+    
 FLAGS = None
+
 
 if __name__ == '__main__':
     # class YOLO defines the default value, so suppress any default here
@@ -25,17 +30,17 @@ if __name__ == '__main__':
     Command line options
     '''
     parser.add_argument(
-        '--model', type=str,
+        '--model_path', type=str,
         help='path to model weight file, default ' + YOLO.get_defaults("model_path")
     )
 
     parser.add_argument(
-        '--anchors', type=str,
+        '--anchors_path', type=str,
         help='path to anchor definitions, default ' + YOLO.get_defaults("anchors_path")
     )
 
     parser.add_argument(
-        '--classes', type=str,
+        '--classes_path', type=str,
         help='path to class definitions, default ' + YOLO.get_defaults("classes_path")
     )
 
@@ -60,7 +65,10 @@ if __name__ == '__main__':
         "--output", nargs='?', type=str, default="",
         help = "[Optional] Video output path"
     )
-
+    parser.add_argument(
+        '--test_iou', default=''
+    )
+    
     FLAGS = parser.parse_args()
 
     if FLAGS.image:

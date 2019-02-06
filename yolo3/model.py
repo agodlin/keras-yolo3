@@ -10,9 +10,13 @@ from keras.layers.advanced_activations import LeakyReLU
 from keras.layers.normalization import BatchNormalization
 from keras.models import Model
 from keras.regularizers import l2
-
+from keras import backend
+from keras import layers
+from keras import models
+from keras import utils
+import yolo3.mobilenet_v2_mv as mobilenet_v2
+import keras_applications
 from yolo3.utils import compose
-
 
 @wraps(Conv2D)
 def DarknetConv2D(*args, **kwargs):
@@ -52,6 +56,18 @@ def darknet_body(x):
     x = resblock_body(x, 512, 8)
     x = resblock_body(x, 1024, 4)
     return x
+
+
+def mobilenet_v2_body(inputs, num_anchors, num_classes):
+    input_shape = inputs.shape
+    keras_applications.set_keras_submodules(backend, layers, models, utils)
+    model = mobilenet_v2.MobileNetV2(input_shape=(input_shape[1],input_shape[2],1), alpha=1, input_tensor=inputs, weights=None, include_top=False)
+    x = model.layers[118].output
+    x = compose(DarknetConv2D_BN_Leaky(256, (1,1)))(x)
+    x = compose(DarknetConv2D_BN_Leaky(256, (3,3)))(x)
+    y = compose(DarknetConv2D(num_anchors * (num_classes + 5), (1, 1)))(x)
+    return Model(inputs, [y])
+
 
 def make_last_layers(x, num_filters, out_filters):
     '''6 Conv2D_BN_Leaky layers followed by a Conv2D_linear layer'''
@@ -104,19 +120,12 @@ def tiny_yolo_body(inputs, num_anchors, num_classes):
             MaxPooling2D(pool_size=(2,2), strides=(1,1), padding='same'),
             DarknetConv2D_BN_Leaky(1024, (3,3)),
             DarknetConv2D_BN_Leaky(256, (1,1)))(x1)
-    y1 = compose(
-            DarknetConv2D_BN_Leaky(512, (3,3)),
-            DarknetConv2D(num_anchors*(num_classes+5), (1,1)))(x2)
+    y1 = compose(DarknetConv2D_BN_Leaky(512, (3,3)),DarknetConv2D(num_anchors*(num_classes+5), (1,1)))(x2)
 
-    x2 = compose(
-            DarknetConv2D_BN_Leaky(128, (1,1)),
-            UpSampling2D(2))(x2)
-    y2 = compose(
-            Concatenate(),
-            DarknetConv2D_BN_Leaky(256, (3,3)),
-            DarknetConv2D(num_anchors*(num_classes+5), (1,1)))([x2,x1])
+    x2 = compose(DarknetConv2D_BN_Leaky(128, (1,1)),UpSampling2D(2))(x2)
+    y2 = compose(Concatenate(),DarknetConv2D_BN_Leaky(256, (3,3)),DarknetConv2D(num_anchors*(num_classes+5), (1,1)))([x2,x1])
 
-    return Model(inputs, [y1,y2])
+    return Model(inputs, [y1, y2])
 
 
 def yolo_head(feats, anchors, num_classes, input_shape, calc_loss=False):
@@ -144,6 +153,7 @@ def yolo_head(feats, anchors, num_classes, input_shape, calc_loss=False):
 
     if calc_loss == True:
         return grid, feats, box_xy, box_wh
+
     return box_xy, box_wh, box_confidence, box_class_probs
 
 
@@ -151,6 +161,7 @@ def yolo_correct_boxes(box_xy, box_wh, input_shape, image_shape):
     '''Get corrected boxes'''
     box_yx = box_xy[..., ::-1]
     box_hw = box_wh[..., ::-1]
+
     input_shape = K.cast(input_shape, K.dtype(box_yx))
     image_shape = K.cast(image_shape, K.dtype(box_yx))
     new_shape = K.round(image_shape * K.min(input_shape/image_shape))
@@ -175,12 +186,14 @@ def yolo_correct_boxes(box_xy, box_wh, input_shape, image_shape):
 
 def yolo_boxes_and_scores(feats, anchors, num_classes, input_shape, image_shape):
     '''Process Conv layer output'''
+
     box_xy, box_wh, box_confidence, box_class_probs = yolo_head(feats,
         anchors, num_classes, input_shape)
     boxes = yolo_correct_boxes(box_xy, box_wh, input_shape, image_shape)
     boxes = K.reshape(boxes, [-1, 4])
     box_scores = box_confidence * box_class_probs
     box_scores = K.reshape(box_scores, [-1, num_classes])
+
     return boxes, box_scores
 
 
@@ -192,11 +205,12 @@ def yolo_eval(yolo_outputs,
               score_threshold=.6,
               iou_threshold=.5):
     """Evaluate YOLO model on given input and return filtered boxes."""
+    yolo_outputs = [yolo_outputs]
     num_layers = len(yolo_outputs)
-    anchor_mask = [[6,7,8], [3,4,5], [0,1,2]] if num_layers==3 else [[3,4,5], [1,2,3]] # default setting
-    input_shape = K.shape(yolo_outputs[0])[1:3] * 32
+    input_shape = K.shape(yolo_outputs[0])[1:3] * 16
     boxes = []
     box_scores = []
+    anchor_mask = [[0]]
     for l in range(num_layers):
         _boxes, _box_scores = yolo_boxes_and_scores(yolo_outputs[l],
             anchors[anchor_mask[l]], num_classes, input_shape, image_shape)
@@ -245,10 +259,10 @@ def preprocess_true_boxes(true_boxes, input_shape, anchors, num_classes):
     y_true: list of array, shape like yolo_outputs, xywh are reletive value
 
     '''
-    assert (true_boxes[..., 4]<num_classes).all(), 'class id must be less than num_classes'
-    num_layers = len(anchors)//3 # default setting
-    anchor_mask = [[6,7,8], [3,4,5], [0,1,2]] if num_layers==3 else [[3,4,5], [1,2,3]]
 
+    assert (true_boxes[..., 4]<num_classes).all(), 'class id must be less than num_classes'
+    anchor_mask = [[0]]
+    num_layers = len(anchors)//len(anchor_mask[0]) # default setting
     true_boxes = np.array(true_boxes, dtype='float32')
     input_shape = np.array(input_shape, dtype='int32')
     boxes_xy = (true_boxes[..., 0:2] + true_boxes[..., 2:4]) // 2
@@ -257,7 +271,7 @@ def preprocess_true_boxes(true_boxes, input_shape, anchors, num_classes):
     true_boxes[..., 2:4] = boxes_wh/input_shape[::-1]
 
     m = true_boxes.shape[0]
-    grid_shapes = [input_shape//{0:32, 1:16, 2:8}[l] for l in range(num_layers)]
+    grid_shapes = [input_shape//{0:32, 1:16, 2:8}[l] for l in range(1,2)]
     y_true = [np.zeros((m,grid_shapes[l][0],grid_shapes[l][1],len(anchor_mask[l]),5+num_classes),
         dtype='float32') for l in range(num_layers)]
 
@@ -297,6 +311,7 @@ def preprocess_true_boxes(true_boxes, input_shape, anchors, num_classes):
                     y_true[l][b, j, i, k, 0:4] = true_boxes[b,t, 0:4]
                     y_true[l][b, j, i, k, 4] = 1
                     y_true[l][b, j, i, k, 5+c] = 1
+
 
     return y_true
 
@@ -358,20 +373,19 @@ def yolo_loss(args, anchors, num_classes, ignore_thresh=.5, print_loss=False):
     loss: tensor, shape=(1,)
 
     '''
-    num_layers = len(anchors)//3 # default setting
+    anchors = np.array(anchors)
+    anchor_mask = [[0]]
+    num_layers = len(anchors)//len(anchor_mask[0]) # default setting
     yolo_outputs = args[:num_layers]
     y_true = args[num_layers:]
-    anchor_mask = [[6,7,8], [3,4,5], [0,1,2]] if num_layers==3 else [[3,4,5], [1,2,3]]
-    input_shape = K.cast(K.shape(yolo_outputs[0])[1:3] * 32, K.dtype(y_true[0]))
+    input_shape = K.cast(K.shape(yolo_outputs[0])[1:3] * 16, K.dtype(y_true[0]))
     grid_shapes = [K.cast(K.shape(yolo_outputs[l])[1:3], K.dtype(y_true[0])) for l in range(num_layers)]
     loss = 0
     m = K.shape(yolo_outputs[0])[0] # batch size, tensor
     mf = K.cast(m, K.dtype(yolo_outputs[0]))
-
     for l in range(num_layers):
         object_mask = y_true[l][..., 4:5]
         true_class_probs = y_true[l][..., 5:]
-
         grid, raw_pred, pred_xy, pred_wh = yolo_head(yolo_outputs[l],
              anchors[anchor_mask[l]], num_classes, input_shape, calc_loss=True)
         pred_box = K.concatenate([pred_xy, pred_wh])
