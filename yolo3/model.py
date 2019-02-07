@@ -133,7 +133,7 @@ def tiny_yolo_body(inputs, num_anchors, num_classes):
 
 def yolo_head(feats, anchors, num_classes, input_shape, calc_loss=False):
     """Convert final layer features to bounding box parameters."""
-    feats = Reshape((12, 12, 6))(feats)
+    feats = Reshape((11, 11, 6))(feats)
     num_anchors = len(anchors)
     # Reshape to batch, height, width, num_anchors, box_params.
     anchors_tensor = K.reshape(K.constant(anchors), [1, 1, 1, num_anchors, 2])
@@ -220,7 +220,6 @@ def yolo_eval(yolo_outputs,
         yolo_outputs[0] = K.variable(yolo_outputs[0])
     anchor_mask = [[6,7,8], [3,4,5], [0,1,2]] if num_layers==3 else [[0]] # default setting
     input_shape = K.shape(yolo_outputs[0])[1:3] * 16
-    print(input_shape)
     boxes = []
     box_scores = []
     for l in range(num_layers):

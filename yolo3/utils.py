@@ -34,9 +34,10 @@ def letterbox_image(image, size):
     new_image = Image.fromarray(np.zeros((w, h), dtype=np.float32))
     new_image.paste(Image.fromarray(image), (dx, dy))
     image = np.asarray(new_image)
-    image_data = image / 256.
+    # image_data = image / 256.
+    image_data = (image - 127.5) / 128.
     image_data[image_data > 1] = 1
-    image_data[image_data < 0] = 0
+    image_data[image_data < -1] = -1
     image_data = np.expand_dims(image_data, axis=2)
 
     return image_data

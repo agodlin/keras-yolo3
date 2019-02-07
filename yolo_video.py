@@ -8,32 +8,44 @@ import numpy
 import cv2
 import data_io
 import mtcnn_pp
+import os
 def detect_img(yolo):
-    while True:
+    fp = r'X:\3D_ValidationVol1\Face\lobby\fixed\RSMW_2019-01-15_15-28-18_uid_79582'
+    images = [os.path.join(fp, name) for name in os.listdir(fp)]
+
+    for img in images:
 
         # img = input('Input image filename:')
-        img = r'C:\temp\face_image.jpg'
-        img = '\\\\ger\\ec\\proj\\ha\\RSG\\3D_ValidationVol1\\Face\\lobby\\fixed\\RSMW_2019-01-15_15-28-18_uid_79582\\AUTH_ts_153228_exp_30000.000000_res_1920x1080_lux_0.000000_score_-87.065405_SecureAuthenticationAllowed.w10'
+        # img = r'C:\temp\face_image.jpg'
+        # img = '\\\\ger\\ec\\proj\\ha\\RSG\\3D_ValidationVol1\\Face\\lobby\\fixed\\RSMW_2019-01-15_15-28-18_uid_79582\\AUTH_ts_153228_exp_30000.000000_res_1920x1080_lux_0.000000_score_-87.065405_SecureAuthenticationAllowed.w10'
+        # if 'FaceNotFound' in img or 'LANDMARKS_FAIL' in img:
+        #     continue
+        print(os.path.basename(img))
         try:
             image = data_io.read_w10(img)
-            image = mtcnn_pp.mtcnn_preprocess(image)
+            image = mtcnn_pp.mtcnn_preprocess(image, 1)
         except:
             print('Open Error! Try again!')
             continue
-        else:
-            out_boxes, out_scores, out_classes = yolo.detect_image2(image)
-            top, left, bottom, right = out_boxes[0]
+        image = image[200:980, 500:1500]
+        color = (image).astype(np.uint8)
+        color = cv2.cvtColor(color, cv2.COLOR_GRAY2RGB)
+
+        out_boxes, out_scores, out_classes = yolo.detect_image2(image)
+        for i in range(len(out_boxes)):
+            if out_scores[i] < 0.5:
+                continue
+            top, left, bottom, right = out_boxes[i]
             top = max(0, np.floor(top + 0.5).astype('int32'))
             left = max(0, np.floor(left + 0.5).astype('int32'))
             bottom = min(image.shape[0], np.floor(bottom + 0.5).astype('int32'))
             right = min(image.shape[1], np.floor(right + 0.5).astype('int32'))
             box = np.array([left, top, right, bottom])
-            print(box)
-            color = (image).astype(np.uint8)
+            print(box, right-left, bottom-top)
             cv2.rectangle(color, tuple(box[:2].astype(np.int)), tuple(box[2:4].astype(np.int)),
                           (0, 255, 0), 3)
-            cv2.imshow('', color)
-            cv2.waitKey()
+        cv2.imshow('', color)
+        cv2.waitKey()
     yolo.close_session()
     
 FLAGS = None
@@ -97,14 +109,14 @@ def test_iou(yolo, annotation_path):
     print('score err, iou err', err_score/total*100, err_iou/total*100)
 
 def test_iou2(yolo, annotation_path):
-    val_images = get_annotation_list(annotation_path)
+    val_images = get_annotation_list(annotation_path)[:10]
     tpr = 0
     err = 0
     err_score = 0
     err_iou = 0
     not_supported = 0
     total = 0
-    for annotation_line in tqdm(val_images):
+    for annotation_line in (val_images):
         file_path, rects, _ = parse_line(annotation_line)
         try:
             color = cv2.imread(file_path, cv2.IMREAD_UNCHANGED)
@@ -118,6 +130,26 @@ def test_iou2(yolo, annotation_path):
             print(e)
             continue
         boxes, scores, out_classes = yolo.detect_image2(image)
+        print(os.path.basename(file_path))
+        for i in range(len(boxes)):
+            score = scores[i]
+            if score < 0.5:
+                err_score += 1
+                total += 1
+                continue
+            top, left, bottom, right = boxes[i]
+            top = max(0, np.floor(top + 0.5).astype('int32'))
+            left = max(0, np.floor(left + 0.5).astype('int32'))
+            bottom = min(image.shape[0], np.floor(bottom + 0.5).astype('int32'))
+            right = min(image.shape[1], np.floor(right + 0.5).astype('int32'))
+            found = -1
+            box = np.array([left, top, right, bottom])
+            cv2.rectangle(color, tuple(box[:2].astype(np.int)), tuple(box[2:4].astype(np.int)),
+                          (0, 255, 0), 3)
+            cv2.imshow('', color)
+            cv2.waitKey()
+            print(box, scores[i])
+        continue
 
         if rects is None and (boxes is None or len(boxes) == 0):
             tpr+=1
@@ -204,11 +236,11 @@ def parse_line(image_line):
 
 
 def get_annotation_list(annotation_path):
-    val_split = 0.1
+    val_split = 1
     with open(annotation_path) as f:
         lines = f.readlines()
     np.random.seed(10101)
-    np.random.shuffle(lines)
+    # np.random.shuffle(lines)
     np.random.seed(None)
     num_val = int(len(lines)*val_split)
     num_train = len(lines) - num_val
@@ -265,10 +297,18 @@ if __name__ == '__main__':
     )
     
     FLAGS = parser.parse_args()
-    FLAGS.image = True
-    FLAGS.model_path = 'logs/000/trained_weights_final.h5'
+    FLAGS.image = r'E:\datasets\wider_local.txt'
+    _defaults = {
+        "model_path": r'C:\temp\models\v2_176_1_1\trained_weights_final.h5',
+        "anchors_path": 'C:/work/face-algo/Landmarks/FaceDetectorLight/keras-yolo3/model_data/tiny_yolo_anchors.txt',
+        "classes_path": 'C:/work/face-algo/Landmarks/FaceDetectorLight/keras-yolo3/model_data/voc_classes.txt',
+        "score" : 0.3,
+        "iou" : 0.45,
+        "model_image_size" : (176, 176),
+        "gpu_num" : 1,
+    }
     if FLAGS.test_iou:
-        test_iou2(YOLO(**vars(FLAGS)), FLAGS.test_iou)
+        test_iou2(YOLO(**_defaults), FLAGS.test_iou)
     
     elif FLAGS.image:
         """
@@ -277,7 +317,7 @@ if __name__ == '__main__':
         print("Image detection mode")
         if "input" in FLAGS:
             print(" Ignoring remaining command line arguments: " + FLAGS.input + "," + FLAGS.output)
-        detect_img(YOLO(**vars(FLAGS)))
+        detect_img(YOLO(**_defaults))
     elif "input" in FLAGS:
         detect_video2(YOLO(**vars(FLAGS)), FLAGS.input, FLAGS.output)
     else:

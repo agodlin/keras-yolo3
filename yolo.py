@@ -17,7 +17,7 @@ from yolo3.model import yolo_eval, yolo_body, tiny_yolo_body, mobilenet_v2_body
 from yolo3.utils import letterbox_image
 import os
 from keras.utils import multi_gpu_model
-
+import cv2
 class YOLO(object):
     _defaults = {
         "model_path": 'model_data/yolo.h5',
@@ -109,7 +109,6 @@ class YOLO(object):
         # boxes, scores, classes = yolo_eval(self.yolo_model.output, self.anchors,
         #         len(self.class_names), self.input_image_shape,
         #         score_threshold=self.score, iou_threshold=self.iou)
-        print(boxes, scores, classes)
         return boxes, scores, classes
 
     def detect_image(self, image):
@@ -117,8 +116,8 @@ class YOLO(object):
         start = timer()
 
         if self.model_image_size != (None, None):
-            assert self.model_image_size[0]%32 == 0, 'Multiples of 32 required'
-            assert self.model_image_size[1]%32 == 0, 'Multiples of 32 required'
+            assert self.model_image_size[0]%16 == 0, 'Multiples of 32 required'
+            assert self.model_image_size[1]%16 == 0, 'Multiples of 32 required'
             boxed_image = letterbox_image(image, tuple(reversed(self.model_image_size)))
         else:
             new_image_size = (image.width - (image.width % 32),
@@ -186,21 +185,19 @@ class YOLO(object):
 
     def detect_image2(self, image):
         if self.model_image_size != (None, None):
-            assert self.model_image_size[0]%32 == 0, 'Multiples of 32 required'
-            assert self.model_image_size[1]%32 == 0, 'Multiples of 32 required'
+            assert self.model_image_size[0]%16 == 0, 'Multiples of 32 required'
+            assert self.model_image_size[1]%16 == 0, 'Multiples of 32 required'
             boxed_image = letterbox_image(image, tuple(reversed(self.model_image_size)))
         else:
             new_image_size = (image.width - (image.width % 32),
                               image.height - (image.height % 32))
             boxed_image = letterbox_image(image, new_image_size)
         #image_data = np.array(boxed_image, dtype='float32')
-
         #image_data /= 255.
         image_data = np.array(boxed_image, dtype='float32')
         image_data = np.expand_dims(image_data, 0)  # Add batch dimension.
 
         features = self.yolo_model.predict(image_data)
-
         out_boxes, out_scores, out_classes = yolo_eval(features, self.anchors,
                 len(self.class_names), [image.shape[0], image.shape[1]],
                 score_threshold=self.score, iou_threshold=self.iou)
@@ -214,7 +211,21 @@ class YOLO(object):
         #     })
 
         return K.eval(out_boxes), K.eval(out_scores), K.eval(out_classes)
-        
+
+    def detect_features(self, features, image):
+        out_boxes, out_scores, out_classes = yolo_eval(features, self.anchors,
+                len(self.class_names), [image.shape[0], image.shape[1]],
+                score_threshold=self.score, iou_threshold=self.iou)
+
+        # out_boxes, out_scores, out_classes = self.sess.run(
+        #     [self.boxes, self.scores, self.classes],
+        #     feed_dict={
+        #         self.yolo_model.input: image_data,
+        #         self.input_image_shape: [image.shape[0], image.shape[1]],
+        #         K.learning_phase(): 0
+        #     })
+
+        return K.eval(out_boxes), K.eval(out_scores), K.eval(out_classes)
         
 def detect_video(yolo, video_path, output_path=""):
     import cv2
