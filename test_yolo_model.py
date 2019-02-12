@@ -6,9 +6,10 @@ from tqdm import tqdm
 import numpy as np
 import numpy
 import cv2
+from utils import yolo_utils
 
-def test_iou2(yolo, annotation_path):
-    val_images = get_annotation_list(annotation_path)
+def test_iou(yolo, annotation_path):
+    val_images = yolo_utils.get_train_val_annotation_list(annotation_path)
     tpr = 0
     err = 0
     err_score = 0
@@ -16,7 +17,7 @@ def test_iou2(yolo, annotation_path):
     not_supported = 0
     total = 0
     for annotation_line in tqdm(val_images):
-        file_path, rects, _ = parse_line(annotation_line)
+        file_path, rects, _ = yolo_utils.parse_line(annotation_line)
         try:
             color = cv2.imread(file_path, cv2.IMREAD_UNCHANGED)
             if len(color.shape) > 2:
@@ -59,7 +60,7 @@ def test_iou2(yolo, annotation_path):
             box = np.array([left, top, right, bottom])
             for j in range(len(rects)):
                 rect = rects[j]
-                iou = bb_intersection_over_union(rect, box)
+                iou = yolo_utils.bb_intersection_over_union(rect, box)
 
                 if iou > 0.5:
                     found = j
@@ -76,106 +77,39 @@ def test_iou2(yolo, annotation_path):
     print('score err, iou err', err_score / total * 100, err_iou / total * 100)
 
 
-def bb_intersection_over_union(boxA, boxB):
-    # determine the (x, y)-coordinates of the intersection rectangle
-    xA = max(boxA[0], boxB[0])
-    yA = max(boxA[1], boxB[1])
-    xB = min(boxA[2], boxB[2])
-    yB = min(boxA[3], boxB[3])
-
-    # compute the area of intersection rectangle
-    interArea = max(0, xB - xA + 1) * max(0, yB - yA + 1)
-
-    # compute the area of both the prediction and ground-truth
-    # rectangles
-    boxAArea = (boxA[2] - boxA[0] + 1) * (boxA[3] - boxA[1] + 1)
-    boxBArea = (boxB[2] - boxB[0] + 1) * (boxB[3] - boxB[1] + 1)
-
-    # compute the intersection over union by taking the intersection
-    # area and dividing it by the sum of prediction + ground-truth
-    # areas - the interesection area
-    iou = interArea / float(boxAArea + boxBArea - interArea)
-
-    # return the intersection over union value
-    return iou
-
-
-def parse_line(image_line):
-    data = image_line.strip().split()
-    file_path = data[0]
-    if len(data) == 1:
-        return file_path, None, None
-
-    rects = []
-    for i in range(1, len(data)):
-        rect_str, class_id = data[1].split(',')[:4], data[1].split(',')[-1]
-        rect = list(map(int, rect_str))
-        rects.append(rect)
-
-    return file_path, np.array(rects), class_id
-
-
-def get_annotation_list(annotation_path):
-    val_split = 0.1
-    with open(annotation_path) as f:
-        lines = f.readlines()
-    np.random.seed(10101)
-    np.random.shuffle(lines)
-    np.random.seed(None)
-    num_val = int(len(lines) * val_split)
-    num_train = len(lines) - num_val
-
-    val_images = lines[num_train:]
-    print('Testing on', len(val_images), 'images')
-    return val_images
-
-
 if __name__ == '__main__':
-    # class YOLO defines the default value, so suppress any default here
     parser = argparse.ArgumentParser(argument_default=argparse.SUPPRESS)
     '''
     Command line options
     '''
     parser.add_argument(
-        '--model_path', type=str,
-        help='path to model weight file, default ' + YOLO.get_defaults("model_path")
+        '--model_path', type=str, default=""
     )
 
     parser.add_argument(
-        '--anchors_path', type=str,
-        help='path to anchor definitions, default ' + YOLO.get_defaults("anchors_path")
+        '--anchors_path', type=str, default="model_data/face_anchors.txt"
     )
 
     parser.add_argument(
-        '--classes_path', type=str,
-        help='path to class definitions, default ' + YOLO.get_defaults("classes_path")
+        '--num_classes', type=int, default=1
     )
 
     parser.add_argument(
-        '--gpu_num', type=int,
-        help='Number of GPU to use, default ' + str(YOLO.get_defaults("gpu_num"))
+        '--score_th', type=float, default=0.5
     )
 
     parser.add_argument(
-        '--image', default=False, action="store_true",
-        help='Image detection mode, will ignore all positional arguments'
-    )
-    '''
-    Command line positional arguments -- for video detection mode
-    '''
-    parser.add_argument(
-        "--input", nargs='?', type=str, required=False, default='./path2your_video',
-        help="Video input path"
+        '--iou_th', type=int, default=0.5
     )
 
     parser.add_argument(
-        "--output", nargs='?', type=str, default="",
-        help="[Optional] Video output path"
-    )
-    parser.add_argument(
-        '--test_iou', default=''
+        '--model_input_shape', type=tuple, default=(176, 176)
     )
 
+    parser.add_argument(
+        '--val_list', type=str, default="", help = "path to validation list"
+    )
     FLAGS = parser.parse_args()
-
-    test_iou2(YOLO(**vars(FLAGS)), FLAGS.test_iou)
+    anchors = yolo_utils.get_anchors(FLAGS.anchors_path)
+    yolo = YOLO(FLAGS.model_path, anchors, FLAGS.num_classes, FLAGS.score_th, FLAGS.iou_th, FLAGS.model_input_shape)
+    test_iou(yolo, FLAGS.train_list)

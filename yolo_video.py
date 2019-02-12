@@ -5,13 +5,20 @@ import cv2
 import data_io
 import mtcnn_pp
 import os
+from utils import yolo_utils
 
 def detect_img(yolo, fp):
-    images = [os.path.join(fp, name) for name in os.listdir(fp) if name.endswith('w10')]
+    images_types = ['png', 'jpg']
+    images = [os.path.join(fp, name) for name in os.listdir(fp)]
     for img in images:
         print(os.path.basename(img))
-        image = data_io.read_w10(img)
-        image = mtcnn_pp.mtcnn_preprocess(image, 1)
+        if img.endswith('w10'):
+            image = data_io.read_w10(img)
+            image = mtcnn_pp.mtcnn_preprocess(image, 1)
+        elif img.split('.')[-1] in images_types:
+            image = cv2.imread(img, cv2.IMREAD_GRAYSCALE)
+        else:
+            continue
         # image = image[:, 308:716+308]
         yolo.detect_image(image)
         color = image.astype(np.uint8)
@@ -36,47 +43,42 @@ def detect_img(yolo, fp):
     
 FLAGS = None
 
-
 if __name__ == '__main__':
-    # class YOLO defines the default value, so suppress any default here
     parser = argparse.ArgumentParser(argument_default=argparse.SUPPRESS)
     '''
     Command line options
     '''
     parser.add_argument(
-        '--model_path', type=str, default=""
+        '--model_path', type=str, default="model_data/v2_176_1/trained_weights_final.h5"
     )
 
     parser.add_argument(
-        '--anchors_path', type=str, default=""
+        '--anchors_path', type=str, default="model_data/face_anchors.txt"
     )
 
     parser.add_argument(
-        '--classes_path', type=str, default=""
+        '--num_classes', type=int, default=1
+    )
+
+    parser.add_argument(
+        '--score_th', type=float, default=0.5
+    )
+
+    parser.add_argument(
+        '--iou_th', type=int, default=0.5
+    )
+
+    parser.add_argument(
+        '--model_input_shape', type=tuple, default=(176, 176)
     )
 
     parser.add_argument(
         '--image', type=str, default="", help = "images folder input path"
     )
-    '''
-    Command line positional arguments -- for video detection mode
-    '''
-    parser.add_argument(
-        "--input", type=str, default="", help = "Video input path"
-    )
-
     FLAGS = parser.parse_args()
-    d = {}
-    d.update(**vars(FLAGS))
+    anchors = yolo_utils.get_anchors(FLAGS.anchors_path)
+    yolo = YOLO(FLAGS.model_path, anchors, FLAGS.num_classes, FLAGS.score_th, FLAGS.iou_th, FLAGS.model_input_shape)
     if FLAGS.image:
-        """
-        Image detection mode, disregard any remaining command line arguments
-        """
-        print("Image detection mode")
-        if "input" in FLAGS:
-            print(" Ignoring remaining command line arguments: " + FLAGS.input + "," + FLAGS.output)
-        detect_img(YOLO(**d), FLAGS.image)
-    elif "input" in FLAGS:
-        detect_video(YOLO(**d), FLAGS.input)
+        detect_img(yolo, FLAGS.image)
     else:
-        print("Must specify at least video_input_path.  See usage with --help.")
+        detect_video(yolo)
