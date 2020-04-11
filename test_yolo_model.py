@@ -1,6 +1,6 @@
 import sys
 import argparse
-from yolo import YOLO, detect_video, detect_video2
+from yolo import YOLO, detect_video
 from PIL import Image
 from tqdm import tqdm
 import numpy as np
@@ -9,7 +9,8 @@ import cv2
 from utils import yolo_utils
 
 def test_iou(yolo, annotation_path):
-    val_images = yolo_utils.get_train_val_annotation_list(annotation_path)
+    # val_images = yolo_utils.get_train_val_annotation_list(annotation_path)
+    val_images = ['C:/work/yolov3-tf2/data/meme2.jpeg']
     tpr = 0
     err = 0
     err_score = 0
@@ -34,15 +35,15 @@ def test_iou(yolo, annotation_path):
         if rects is None and (boxes is None or len(boxes) == 0):
             tpr += 1
             total += 1
-            continue
+            # continue
         elif rects is not None and (boxes is None or len(boxes) == 0):
             err += len(rects)
             total += len(rects)
-            continue
+            # continue
         elif rects is None:
             not_supported += 1
             total += 1
-            continue
+            # continue
 
         for i in range(len(boxes)):
             score = scores[i]
@@ -83,7 +84,7 @@ if __name__ == '__main__':
     Command line options
     '''
     parser.add_argument(
-        '--model_path', type=str, default=""
+        '--model_path', type=str, default="C:/work/keras-yolo3/logs/003/ep009-loss9.156-val_loss8.934.h5"
     )
 
     parser.add_argument(
@@ -103,7 +104,7 @@ if __name__ == '__main__':
     )
 
     parser.add_argument(
-        '--model_input_shape', type=tuple, default=(176, 176)
+        '--model_input_shape', type=tuple, default=(144, 144)
     )
 
     parser.add_argument(
@@ -112,4 +113,4 @@ if __name__ == '__main__':
     FLAGS = parser.parse_args()
     anchors = yolo_utils.get_anchors(FLAGS.anchors_path)
     yolo = YOLO(FLAGS.model_path, anchors, FLAGS.num_classes, FLAGS.score_th, FLAGS.iou_th, FLAGS.model_input_shape)
-    test_iou(yolo, FLAGS.train_list)
+    test_iou(yolo, FLAGS.val_list)

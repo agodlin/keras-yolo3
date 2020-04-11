@@ -8,7 +8,7 @@ from timeit import default_timer as timer
 import numpy as np
 from keras import backend as K
 from keras.layers import Input
-from yolo3.model import yolo_eval, mobilenet_v2_body
+from yolo3.model import yolo_eval, tiny_yolo_body, magic_body_2
 from yolo3.utils import letterbox_image
 import os
 import cv2
@@ -35,7 +35,7 @@ class YOLO:
 
         input_shape = (self.model_input_shape[0], self.model_input_shape[1], 1)
         print('Model Info', model_path, num_anchors, self.num_classes, input_shape)
-        self.yolo_model = mobilenet_v2_body(Input(shape=input_shape), num_anchors//self.num_outputs, self.num_classes)
+        self.yolo_model = magic_body_2(Input(shape=input_shape), num_anchors//self.num_outputs, self.num_classes)
         self.yolo_model.load_weights(self.model_path)
 
         # Generate output tensor targets for filtered bounding boxes.

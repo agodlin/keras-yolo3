@@ -79,7 +79,7 @@ from __future__ import division
 import os
 import warnings
 import numpy as np
-
+import tensorflow as tf
 from keras_applications.mobilenet_v2 import correct_pad
 from keras_applications.mobilenet_v2 import get_submodules_from_kwargs
 from keras_applications.imagenet_utils import decode_predictions
@@ -137,6 +137,7 @@ def MobileNetV2(input_shape=None,
                 input_tensor=None,
                 pooling=None,
                 classes=1000,
+                kargs=None,
                 **kwargs):
     """Instantiates the MobileNetV2 architecture.
 
@@ -194,7 +195,7 @@ def MobileNetV2(input_shape=None,
             rows when weights='imagenet'
     """
     global backend, layers, models, keras_utils
-    backend, layers, models, keras_utils = get_submodules_from_kwargs(kwargs)
+    backend, layers, models, keras_utils = kargs
 
     if not (weights in {'imagenet', None} or os.path.exists(weights)):
         raise ValueError('The `weights` argument should be either '

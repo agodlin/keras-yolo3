@@ -17,6 +17,9 @@ from keras import utils
 import yolo3.mobilenet_v2_mv as mobilenet_v2
 import keras_applications
 from yolo3.utils import compose
+from yolo3.mobilenet_v2_1 import build_model
+from yolo3.mobilenet_v2_2 import build_model_2
+
 
 @wraps(Conv2D)
 def DarknetConv2D(*args, **kwargs):
@@ -35,21 +38,32 @@ def DarknetConv2D_BN_Leaky(*args, **kwargs):
         BatchNormalization(),
         LeakyReLU(alpha=0.1))
 
-
-def mobilenet_v2_body(inputs, num_anchors, num_classes):
-    input_shape = inputs.shape
-    keras_applications.set_keras_submodules(backend, layers, models, utils)
-
-    model = mobilenet_v2.MobileNetV2(input_shape=(input_shape[1],input_shape[2],1), alpha=1, input_tensor=inputs, weights=None, include_top=False)
-    x = model.layers[118].output
-
-    x = DarknetConv2D_BN_Leaky(128, (1,1))(x)
+def tiny_yolo_body(inputs, num_anchors, num_classes):
+    '''Create Tiny YOLO_v3 model CNN body in keras.'''
+    x = DarknetConv2D_BN_Leaky(16, (3,3))(inputs)
+    x = MaxPooling2D(pool_size=(2,2), strides=(2,2), padding='same')(x)
+    x = DarknetConv2D_BN_Leaky(32, (3,3))(x)
+    x = MaxPooling2D(pool_size=(2,2), strides=(2,2), padding='same')(x)
+    x = DarknetConv2D_BN_Leaky(64, (3,3))(x)
+    x = MaxPooling2D(pool_size=(2,2), strides=(2,2), padding='same')(x)
+    x = DarknetConv2D_BN_Leaky(128, (3,3))(x)
+    x = MaxPooling2D(pool_size=(2,2), strides=(2,2), padding='same')(x)
     x = DarknetConv2D_BN_Leaky(256, (3,3))(x)
+    x = DarknetConv2D_BN_Leaky(512, (3,3))(x)
+    y = DarknetConv2D(num_anchors*(num_classes+5), (1,1))(x)
 
-    y = DarknetConv2D(num_anchors * (num_classes + 5), (1, 1))(x)
 
     return Model(inputs, [y])
 
+def magic_body(inputs, num_anchors, num_classes):
+    x = build_model(inputs, expansion=6, last_conv_block_size=0, last_inverted=False)
+    y = DarknetConv2D(num_anchors * (num_classes + 5), (1, 1))(x)
+    return Model(inputs, [y])
+
+def magic_body_2(inputs, num_anchors, num_classes):
+    x = build_model_2(inputs, expansion=6, last_conv_block_size=0, last_inverted=False)
+    y = DarknetConv2D(num_anchors * (num_classes + 5), (1, 1))(x)
+    return Model(inputs, [y])
 
 def yolo_head(feats, anchors, num_classes, input_shape, calc_loss=False):
     """Convert final layer features to bounding box parameters."""

@@ -9,7 +9,7 @@ from keras.models import Model
 from keras.optimizers import Adam
 from keras.callbacks import TensorBoard, ModelCheckpoint, ReduceLROnPlateau, EarlyStopping
 
-from yolo3.model import preprocess_true_boxes, yolo_body, yolo_loss, mobilenet_v2_body
+from yolo3.model import preprocess_true_boxes, yolo_loss, tiny_yolo_body, magic_body, magic_body_2
 from yolo3.utils import get_random_data
 from utils import h5_pb
 from utils import yolo_utils
@@ -19,13 +19,13 @@ FLAGS = None
 
 def _main():
     annotation_path = FLAGS.train_path
-    log_dir = 'logs/000/'
+    log_dir = 'logs/003/'
     classes_path = FLAGS.classes_path
     anchors_path = FLAGS.anchors_path
     class_names = yolo_utils.get_classes(classes_path)
     num_classes = len(class_names)
     anchors = yolo_utils.get_anchors(anchors_path)
-    input_shape = (176,176)
+    input_shape = (144,144)
 
     model,model_test = create_mobilenet_v2_model(input_shape, anchors, num_classes)
 
@@ -74,12 +74,13 @@ def create_mobilenet_v2_model(input_shape, anchors, num_classes):
     num_outputs = 1
     y_true = [Input(shape=(h // {0: 16}[l], w // {0: 16}[l], num_anchors // num_outputs, num_classes + 5)) for l in range(0, 1)]
 
-    model_body = mobilenet_v2_body(image_input, num_anchors // num_outputs, num_classes)
-
+    model_body = magic_body_2(image_input, num_anchors // num_outputs, num_classes)
+    # model_body = tiny_yolo_body(image_input, num_anchors // num_outputs, num_classes)
+    num = model_body.count_params()
     for i, l in enumerate(model_body.layers):
         print(i, l.name, l.input_shape, l.output_shape)
 
-    print('Create Mobilenet V2 model with {} anchors and {} classes.'.format(num_anchors, num_classes))
+    print('Create Model with {} params model with {} anchors and {} classes.'.format(num, num_anchors, num_classes))
 
     model_loss = Lambda(yolo_loss, output_shape=(1,), name='yolo_loss',
                         arguments={'anchors': anchors, 'num_classes': num_classes, 'ignore_thresh': 0.7})(
@@ -116,9 +117,9 @@ def data_generator_wrapper(annotation_lines, batch_size, input_shape, anchors, n
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(argument_default=argparse.SUPPRESS)
-    parser.add_argument('--train_path', type=str, default='train_wider_02.txt')
-    parser.add_argument('--anchors_path', type=str, default='model_data/tiny_yolo_anchors.txt')
-    parser.add_argument('--classes_path', type=str, default='model_data/voc_classes.txt')
+    parser.add_argument('--train_path', type=str, default='D:/datasets/test_dlib_wider.txt')
+    parser.add_argument('--anchors_path', type=str, default='model_data/face_anchors.txt')
+    parser.add_argument('--classes_path', type=str, default='model_data/face_classes.txt')
 
     FLAGS = parser.parse_args()
     _main()
