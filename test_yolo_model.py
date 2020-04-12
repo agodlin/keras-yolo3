@@ -84,7 +84,7 @@ if __name__ == '__main__':
     Command line options
     '''
     parser.add_argument(
-        '--model_path', type=str, default="C:/work/keras-yolo3/logs/003/ep021-loss7.927-val_loss7.625.h5"
+        '--model_path', type=str, default="C:/work/keras-yolo3/logs/003/ep003-loss11.749-val_loss11.061.h5"
     )
 
     parser.add_argument(

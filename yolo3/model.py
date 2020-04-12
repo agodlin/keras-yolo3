@@ -61,7 +61,7 @@ def magic_body(inputs, num_anchors, num_classes):
     return Model(inputs, [y])
 
 def magic_body_2(inputs, num_anchors, num_classes):
-    x = build_model_2(inputs, expansion=6, last_conv_block_size=0, last_inverted=False)
+    x = build_model_2(inputs, expansion=3, last_conv_block_size=0, last_inverted=True)
     y = DarknetConv2D(num_anchors * (num_classes + 5), (1, 1))(x)
     return Model(inputs, [y])
 

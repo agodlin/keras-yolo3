@@ -8,7 +8,7 @@
 
 import tensorflow as tf
 from keras import backend as K
-from keras.layers import Conv2D, Add, ZeroPadding2D, UpSampling2D, Concatenate, MaxPooling2D
+from keras.layers import Conv2D, Add, ZeroPadding2D, UpSampling2D, Concatenate, MaxPooling2D, DepthwiseConv2D, PReLU
 from keras.layers.advanced_activations import LeakyReLU
 from keras.layers.normalization import BatchNormalization
 from keras.models import Model
@@ -58,12 +58,19 @@ def _bottleneck(inputs, filters, kernel, t, s, r=False, trainable=True):
         Output tensor.
     """
 
-    tchannel = K.int_shape(inputs)[-1]*t
+    channel_axis = 1 if K.image_data_format() == 'channels_first' else -1
+    tchannel = K.int_shape(inputs)[channel_axis] * t
 
     x = _conv_block(inputs, tchannel, (1, 1), (1, 1), trainable=trainable)
 
-    x = _conv_block(x, filters, (1, 1), (s, s), trainable=trainable)
+    x = DepthwiseConv2D(kernel, strides=(s, s), depth_multiplier=1, padding='same')(x)
+    x = BatchNormalization()(x)
+    x = LeakyReLU(alpha=0.1)(x)
 
+    x = Conv2D(filters, (1, 1), strides=(1, 1), padding='same')(x)
+    x = BatchNormalization()(x)
+    if r:
+        x = Add()([x, inputs])
     return x
 
 def _bottleneck2(inputs, filters, kernel, t, s, r=False, trainable=True):
@@ -153,13 +160,13 @@ def build_model_2(inputs, expansion=3, last_conv_block_size=1280, last_inverted=
     """
 
     trainable = True
-    x = _conv_block(inputs, 16, (3, 3), strides=(2, 2), trainable=trainable)
-    x = _inverted_residual_block2(x, 32, (3, 3), t=expansion, strides=1, n=2, trainable=trainable)
-    x = _inverted_residual_block2(x, 64, (3, 3), t=expansion, strides=2, n=3, trainable=trainable)
-    x = _inverted_residual_block2(x, 96, (3, 3), t=expansion, strides=2, n=4, trainable=trainable)
-    x = _inverted_residual_block2(x, 128, (3, 3), t=expansion, strides=1, n=3, trainable=trainable)
-    x = _inverted_residual_block2(x, 256, (3, 3), t=expansion, strides=2, n=3, trainable=trainable)
-    # x = _inverted_residual_block2(x, 1024, (3, 3), t=expansion, strides=1, n=3, trainable=trainable)
+    x = _conv_block(inputs, 32, (3, 3), strides=(2, 2), trainable=trainable)
+    x = _inverted_residual_block(x, 16, (3, 3), t=1, strides=1, n=1, trainable=trainable)
+    x = _inverted_residual_block(x, 24, (3, 3), t=expansion, strides=1, n=2, trainable=trainable)
+    x = _inverted_residual_block(x, 32, (3, 3), t=expansion, strides=2, n=3, trainable=trainable)
+    x = _inverted_residual_block(x, 64, (3, 3), t=expansion, strides=2, n=4, trainable=trainable)
+    x = _inverted_residual_block(x, 96, (3, 3), t=expansion, strides=1, n=3, trainable=trainable)
+    x = _inverted_residual_block(x, 160, (3, 3), t=expansion, strides=2, n=3, trainable=trainable)
     if last_inverted:
         x = _inverted_residual_block(x, 320, (3, 3), t=2, strides=1, n=1,trainable=trainable)
     if last_conv_block_size > 0:
