@@ -86,7 +86,7 @@ def _bottleneck2(inputs, filters, kernel, t, s, r=False, trainable=True):
         Output tensor.
     """
 
-    x = _conv_block(inputs, filters, kernel, (1, 1), trainable=trainable)
+    x = _conv_block(inputs, filters, kernel, (s, s), trainable=trainable)
 
     return x
 
@@ -134,10 +134,10 @@ def _inverted_residual_block2(inputs, filters, kernel, t, strides, n, trainable=
     # Returns
         Output tensor.
     """
-    x = inputs
-    if strides == 2:
-        x = MaxPooling2D(pool_size=(2, 2), strides=(2, 2), padding='same')(x)
-    x = _bottleneck2(x, filters, kernel, t, strides, trainable=trainable)
+    x = _bottleneck2(inputs, filters, kernel, t, strides, trainable=trainable)
+
+    x = _bottleneck2(x, filters, kernel, t, 1, r=True, trainable=trainable)
+
     return x
 
 def build_model_2(inputs, expansion=3, last_conv_block_size=1280, last_inverted=False):
@@ -153,14 +153,12 @@ def build_model_2(inputs, expansion=3, last_conv_block_size=1280, last_inverted=
     """
 
     trainable = True
-
-    x = _conv_block(inputs, 16, (3, 3), strides=(1, 1), trainable=trainable)
-
-    x = _inverted_residual_block2(x, 32, (3, 3), t=1, strides=2, n=1, trainable=trainable)
-    x = _inverted_residual_block2(x, 64, (3, 3), t=expansion, strides=2, n=2, trainable=trainable)
-    x = _inverted_residual_block2(x, 128, (3, 3), t=expansion, strides=2, n=3, trainable=trainable)
-    x = _inverted_residual_block2(x, 256, (3, 3), t=expansion, strides=2, n=4, trainable=trainable)
-    x = _inverted_residual_block2(x, 512, (3, 3), t=expansion, strides=1, n=3, trainable=trainable)
+    x = _conv_block(inputs, 16, (3, 3), strides=(2, 2), trainable=trainable)
+    x = _inverted_residual_block2(x, 32, (3, 3), t=expansion, strides=1, n=2, trainable=trainable)
+    x = _inverted_residual_block2(x, 64, (3, 3), t=expansion, strides=2, n=3, trainable=trainable)
+    x = _inverted_residual_block2(x, 96, (3, 3), t=expansion, strides=2, n=4, trainable=trainable)
+    x = _inverted_residual_block2(x, 128, (3, 3), t=expansion, strides=1, n=3, trainable=trainable)
+    x = _inverted_residual_block2(x, 256, (3, 3), t=expansion, strides=2, n=3, trainable=trainable)
     # x = _inverted_residual_block2(x, 1024, (3, 3), t=expansion, strides=1, n=3, trainable=trainable)
     if last_inverted:
         x = _inverted_residual_block(x, 320, (3, 3), t=2, strides=1, n=1,trainable=trainable)
